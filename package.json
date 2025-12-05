@@ -1,0 +1,29 @@
+{
+  "name": "youtube2",
+  "version": "1.0.0",
+  "description": "Pipeline em Node para gerar frames via Whisk e renderizar vídeo 1080p30 com ffmpeg.",
+  "main": "src/index.js",
+  "scripts": {
+    "build:frames": "node src/generate-images.js",
+    "render:video": "node src/render-video.js",
+    "demo": "node src/index.js",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "echo \"No automated tests yet\" && exit 0"
+  },
+  "keywords": [
+    "whisk",
+    "ffmpeg",
+    "video"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "formidable": "^3.5.4",
+    "next": "^16.0.7",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1"
+  }
+}

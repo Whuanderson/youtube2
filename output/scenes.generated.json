@@ -1,0 +1,27 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "fps": 30,
+  "framesDir": "E:\\3 - Programas\\outros\\youtube2\\output\\frames",
+  "generatedAt": "2025-12-05T21:31:54.948Z",
+  "scenes": [
+    {
+      "index": 0,
+      "prompt": "Cena inicial vibrante com logo",
+      "duration": 5,
+      "framePath": "E:\\3 - Programas\\outros\\youtube2\\output\\frames\\frame-001.png"
+    },
+    {
+      "index": 1,
+      "prompt": "Explicacao visual do produto",
+      "duration": 6,
+      "framePath": "E:\\3 - Programas\\outros\\youtube2\\output\\frames\\frame-002.png"
+    },
+    {
+      "index": 2,
+      "prompt": "Call to action final",
+      "duration": 4,
+      "framePath": "E:\\3 - Programas\\outros\\youtube2\\output\\frames\\frame-003.png"
+    }
+  ]
+}

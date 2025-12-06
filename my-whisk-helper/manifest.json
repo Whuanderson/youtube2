@@ -5,8 +5,8 @@
   "manifest_version": 3,
   "permissions": ["tabs", "scripting", "downloads"],
   "host_permissions": [
-    "https://labs.google/*/tools/whisk/*",
     "https://labs.google/*",
+    "https://labs.google/*/tools/whisk/*",
     "http://localhost:3000/*"
   ],
   "background": {
@@ -24,6 +24,10 @@
       ],
       "js": ["content-whisk.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://localhost:3000/*", "https://localhost:3000/*"],
+      "js": ["content-app.js"]
     }
   ]
 }

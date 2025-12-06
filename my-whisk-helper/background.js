@@ -1,33 +1,77 @@
 // my-whisk-helper/background.js
 
-// Só pra saber que a extensão subiu
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("My Whisk Helper installed");
+  console.log('My Whisk Helper installed');
 });
 
-// (Opcional, mas útil) – organizar os nomes dos arquivos baixados pelo Whisk
-// Requer "downloads" em "permissions" no manifest.json
+// Organiza nomes de download (mantém isso!)
 chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
-  // nome original (só o arquivo, sem pastas)
-  const originalName = item.filename.split("/").pop();
-
-  // prefixo simples com data/hora
+  const originalName = item.filename.split('/').pop();
   const now = new Date();
   const stamp = [
     now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-    "-",
-    String(now.getHours()).padStart(2, "0"),
-    String(now.getMinutes()).padStart(2, "0"),
-    String(now.getSeconds()).padStart(2, "0")
-  ].join("");
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+    '-',
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+    String(now.getSeconds()).padStart(2, '0'),
+  ].join('');
 
-  // vai criar uma subpasta "whisk" dentro da pasta de downloads do Chrome
   const newName = `whisk/${stamp}-${originalName}`;
 
   suggest({
     filename: newName,
-    conflictAction: "overwrite"
+    conflictAction: 'overwrite',
   });
+});
+
+// ÚNICO listener de mensagens do background
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // Pedido vindo do app (painel) para rodar o batch
+  if (message.type === 'RUN_BATCH_WITH_SCENES') {
+    const scenes = message.scenes || [];
+
+    // 🔍 Procura abas que sejam do domínio labs.google
+    chrome.tabs.query({ url: ['https://labs.google/*'] }, (tabs) => {
+      const urls = (tabs || []).map((t) => t.url);
+      console.log('[My Whisk Helper][bg] Abas labs.google encontradas:', urls);
+
+      // pega a primeira que contenha /tools/whisk
+      const whiskTab = tabs.find((t) =>
+        (t.url || '').includes('/tools/whisk')
+      );
+
+      if (!whiskTab) {
+        console.warn('[My Whisk Helper][bg] Nenhuma aba do Whisk encontrada.');
+        sendResponse({
+          ok: false,
+          error: 'Nenhuma aba do Whisk encontrada.',
+        });
+        return;
+      }
+
+      console.log(
+        '[My Whisk Helper][bg] Enviando RUN_BATCH_WITH_SCENES para aba:',
+        whiskTab.id,
+        whiskTab.url
+      );
+
+      chrome.tabs.sendMessage(
+        whiskTab.id,
+        { type: 'RUN_BATCH_WITH_SCENES', scenes },
+        (resp) => {
+          console.log(
+            '[My Whisk Helper][bg] Resposta da aba do Whisk:',
+            resp
+          );
+          sendResponse(resp || { ok: true });
+        }
+      );
+    });
+
+    return true; // resposta assíncrona
+  }
+
+  // (outros tipos de mensagem poderiam ser tratados aqui)
 });

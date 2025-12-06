@@ -75,8 +75,10 @@ async function writeMetadata(entries) {
     fps,
     framesDir,
     generatedAt: new Date().toISOString(),
+    pendingBatch: true,        // 👈 marca que tem batch pendente
     scenes: entries,
   };
+
   await fs.writeFile(metadataPath, JSON.stringify(payload, null, 2));
 }
 

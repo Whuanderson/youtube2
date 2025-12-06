@@ -1,161 +1,208 @@
 // content-whisk.js
 
-console.log("My Whisk Helper content script loaded");
+console.log('My Whisk Helper content script loaded');
 
-// 1) Preenche a caixa de prompt
+// ---------- helpers de DOM ----------
+
+let isRunningBatch = false;
+
+function findPromptBox() {
+  return (
+    document.querySelector('textarea') ||
+    document.querySelector('[data-testid="prompt-input"]') ||
+    document.querySelector('div[contenteditable="true"]')
+  );
+}
+
 function setPromptInBox(prompt) {
-  const textarea = document.querySelector("textarea");
-
-  if (!textarea) {
-    console.warn("[My Whisk Helper] textarea não encontrada. Ajuste o seletor.");
+  const box = findPromptBox();
+  if (!box) {
+    console.warn('[My Whisk Helper] campo de prompt não encontrado.');
     return false;
   }
 
-  textarea.focus();
-  textarea.value = prompt;
+  if (box.tagName === 'TEXTAREA') {
+    box.focus();
+    box.value = prompt;
+    box.dispatchEvent(
+      new InputEvent('input', {
+        bubbles: true,
+        cancelable: true,
+        inputType: 'insertText',
+        data: prompt,
+      })
+    );
+  } else {
+    // contenteditable
+    box.focus();
+    box.innerText = prompt;
+    box.dispatchEvent(
+      new InputEvent('input', {
+        bubbles: true,
+        cancelable: true,
+        inputType: 'insertText',
+        data: prompt,
+      })
+    );
+  }
 
-  const event = new InputEvent("input", {
-    bubbles: true,
-    cancelable: true,
-    inputType: "insertText",
-    data: prompt
-  });
-
-  textarea.dispatchEvent(event);
-
-  console.log("[My Whisk Helper] Prompt aplicado no textarea.");
+  console.log('[My Whisk Helper] Prompt aplicado:', prompt);
   return true;
 }
 
-// 2) Define a proporção (Quadrado / Retrato / Paisagem)
-function setAspectRatio(ratio = "landscape") {
-  const labelMap = {
-    square: "Quadrado",
-    portrait: "Retrato",
-    landscape: "Paisagem"
-  };
-
-  const label = labelMap[ratio] || labelMap.landscape;
-  const spans = Array.from(document.querySelectorAll("span"));
-
-  for (const span of spans) {
-    const text = (span.textContent || "").trim();
-    if (text === label) {
-      // estrutura: <div> <button>…</button> <span>Label</span> </div>
-      let btn = span.previousElementSibling;
-      if (!btn || btn.tagName !== "BUTTON") {
-        btn = span.parentElement?.querySelector("button");
-      }
-
-      if (btn) {
-        btn.click();
-        console.log(
-          "[My Whisk Helper] Proporção selecionada:",
-          ratio,
-          "=>",
-          label
-        );
-        return true;
-      }
-    }
-  }
-
-  console.warn("[My Whisk Helper] Não achei opção de proporção para:", ratio);
-  return false;
-}
-
-// 3) Clica no botão de gerar imagens (seta roxa)
 function clickGenerateButton() {
   const btn =
     document.querySelector('button[aria-label="Enviar comando"]') ||
-    document.querySelector(
-      // fallback no seletor copiado do DevTools
-      '#__next > div.sc-c7ee1759-1.crzReP > div > div.sc-6fe1c1c9-3.isamFv > div.sc-6fe1c1c9-4.jxKrrR > div > div > div > div > div.sc-d9f87e16-0.kKoVkw > div > div.sc-18deeb1d-1.YAIru > div.sc-18deeb1d-3.dgKBQe > div > button.sc-bece3008-0.iCCEfi.sc-18deeb1d-6.cTTkJg'
-    );
+    document.querySelector('button[aria-label="Generate"]') ||
+    document.querySelector('button[aria-label="Gerar"]') ||
+    document.querySelector('button[data-testid="generate-button"]');
 
   if (!btn) {
-    console.warn("[My Whisk Helper] Botão de gerar não encontrado.");
+    console.warn('[My Whisk Helper] Botão de gerar não encontrado.');
     return false;
   }
 
   btn.click();
-  console.log("[My Whisk Helper] Cliquei no botão de gerar.");
+  console.log('[My Whisk Helper] Cliquei no botão de gerar.');
   return true;
 }
 
-// 4) Observa resultados NOVOS e clica em "download"
-function startAutoDownloadWatcher() {
-  console.log("[My Whisk Helper] Iniciando watcher de downloads...");
+function startDownloadWatcherOnce(onDone, timeoutMs = 25000) {
+  console.log('[My Whisk Helper] Iniciando watcher de downloads...');
 
   const root = document.body;
-  const clickedButtons = new WeakSet();
+  const clicked = new WeakSet();
+  let finished = false;
+  let observer;
 
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) {
-        if (!(node instanceof HTMLElement)) continue;
+  const handleNodes = () => {
+    const nodes = Array.from(
+      document.querySelectorAll(
+        '[aria-label="download"], [aria-label="Download"], [aria-label="Baixar"]'
+      )
+    );
 
-        const buttons = [];
+    if (!nodes.length) return;
 
-        if (node.tagName === "BUTTON") {
-          buttons.push(node);
-        }
+    console.log(
+      `[My Whisk Helper] Encontrados ${nodes.length} elementos com aria-label de download.`
+    );
 
-        const innerButtons = node.querySelectorAll("button");
-        innerButtons.forEach((b) => buttons.push(b));
+    let anyClicked = false;
 
-        buttons.forEach((btn) => {
-          const text = (btn.innerText || btn.textContent || "")
-            .trim()
-            .toLowerCase();
+    nodes.forEach((node) => {
+      const btn = node.closest('button') || node;
+      if (clicked.has(btn)) return;
+      clicked.add(btn);
+      btn.click();
+      anyClicked = true;
+    });
 
-          // botão com texto "download"
-          if (text === "download" && !clickedButtons.has(btn)) {
-            clickedButtons.add(btn);
-            console.log(
-              "[My Whisk Helper] Clicando em botão de download novo..."
-            );
-            btn.click();
-          }
-        });
-      }
+    if (anyClicked && !finished) {
+      finished = true;
+      setTimeout(() => {
+        if (observer) observer.disconnect();
+        console.log('[My Whisk Helper] Downloads clicados, encerrando watcher.');
+        onDone?.();
+      }, 2000);
     }
-  });
+  };
 
+  observer = new MutationObserver(handleNodes);
   observer.observe(root, { childList: true, subtree: true });
+
+  // tenta clicar em downloads que já estejam na tela
+  handleNodes();
+
+  // timeout de segurança
+  setTimeout(() => {
+    if (!finished) {
+      finished = true;
+      if (observer) observer.disconnect();
+      console.log(
+        '[My Whisk Helper] Timeout de downloads; seguindo para a próxima cena.'
+      );
+      onDone?.();
+    }
+  }, timeoutMs);
 }
 
-// 5) Listener de mensagens vindas do popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("[My Whisk Helper] Mensagem recebida:", message);
+// ---------- batch controlado pelo painel ----------
 
-  if (message.type !== "SET_WHISK_PROMPT") {
+async function runBatchCore(scenes) {
+  if (isRunningBatch) {
+    console.log('[My Whisk Helper] Já existe um batch em execução, ignorando novo pedido.');
     return;
   }
 
-  const prompt = message.prompt || "";
-  if (!prompt.trim()) {
-    console.warn("[My Whisk Helper] Prompt vazio, nada a fazer.");
-    sendResponse?.({ ok: false, reason: "empty_prompt" });
-    return;
-  }
+  isRunningBatch = true;
+  console.log(`[My Whisk Helper] Rodando batch com ${scenes.length} cenas.`);
 
-  const ok = setPromptInBox(prompt);
-  if (!ok) {
-    sendResponse?.({ ok: false, reason: "prompt_box_not_found" });
-    return;
-  }
+  try {
+    for (let i = 0; i < scenes.length; i += 1) {
+      const scene = scenes[i];
+      const label = `Cena ${i + 1}/${scenes.length}: ${scene.prompt || ''}`;
+      console.log('[My Whisk Helper]', label);
 
-  // sempre usa Paisagem (16:9) por padrão
-  const ratio = message.ratio || "landscape";
-  setAspectRatio(ratio);
+      const ok = setPromptInBox(scene.prompt || '');
+      if (!ok) {
+        console.warn('[My Whisk Helper] Não foi possível aplicar o prompt, pulando cena.');
+        continue;
+      }
 
-  if (message.autoGenerate) {
-    const clicked = clickGenerateButton();
-    if (clicked) {
-      startAutoDownloadWatcher();
+      clickGenerateButton();
+
+      // espera downloads dessa cena
+      await new Promise((resolve) => {
+        startDownloadWatcherOnce(() => {
+          setTimeout(resolve, 3000); // respiro depois do clique nos downloads
+        });
+      });
+
+      // pequeno intervalo entre cenas
+      await new Promise((r) => setTimeout(r, 2000));
     }
+
+    console.log('[My Whisk Helper] Batch concluído.');
+  } finally {
+    isRunningBatch = false;
+  }
+}
+
+// ---------- listener de mensagens ----------
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[My Whisk Helper] Mensagem recebida:', message);
+
+  // ainda permite o uso direto do popup (um prompt só)
+  if (message.type === 'SET_WHISK_PROMPT') {
+    const ok = setPromptInBox(message.prompt || '');
+    if (ok && message.autoGenerate) {
+      clickGenerateButton();
+      startDownloadWatcherOnce();
+    }
+    sendResponse?.({ ok });
+    return;
   }
 
-  sendResponse?.({ ok: true });
+  // chamado pelo background quando o painel clicar em "Gerar frames"
+  if (message.type === 'RUN_BATCH_WITH_SCENES') {
+    const scenes = message.scenes || [];
+    if (!scenes.length) {
+      console.log(
+        '[My Whisk Helper] Nenhuma cena recebida em RUN_BATCH_WITH_SCENES.'
+      );
+      sendResponse?.({ ok: false, error: 'Sem cenas' });
+      return;
+    }
+
+    runBatchCore(scenes)
+      .then(() => sendResponse?.({ ok: true }))
+      .catch((err) => {
+        console.error('[My Whisk Helper] Erro no batch:', err);
+        sendResponse?.({ ok: false, error: err.message });
+      });
+
+    return true; // resposta assíncrona
+  }
 });

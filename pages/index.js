@@ -49,7 +49,7 @@ export default function Home() {
   };
 
   const handleGenerate = async () => {
-    setStatus('Gerando frames (metadata)...');
+    setStatus('Gerando frames...');
     setLoading(true);
     try {
       const res = await fetch('/api/generate', {
@@ -60,15 +60,23 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Falha ao gerar frames');
 
-      setStatus(`Metadata gerada em ${data.metadataPath || data.framesDir}. Agora gere imagens no Whisk e depois importe.`);
-      // atualiza cena do front com o que ficou no metadata (sem frame ainda)
-      await syncScenesFromServer();
+      setStatus(`Frames prontos em ${data.framesDir}. Ajuste as duracoes se quiser e depois renderize.`);
+
+      // 🔔 AVISA A EXTENSÃO: “roda o batch com essas cenas”
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('MY_WHISK_RUN_BATCH', {
+            detail: { scenes },
+          }),
+        );
+      }
     } catch (err) {
       setStatus(err.message);
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleAudioUpload = async (event) => {
     const file = event.target.files?.[0];

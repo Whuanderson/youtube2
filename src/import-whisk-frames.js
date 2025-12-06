@@ -7,7 +7,6 @@ import { framesDir as FRAMES_DIR, metadataPath } from './config.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// onde o Chrome salva os downloads do Whisk
 const WHISK_DOWNLOAD_DIR =
   process.env.WHISK_DOWNLOAD_DIR ||
   path.join(
@@ -30,6 +29,17 @@ function ensureDir(dir) {
   }
 }
 
+function readScenesCount() {
+  try {
+    if (!fs.existsSync(metadataPath)) return 0;
+    const raw = fs.readFileSync(metadataPath, 'utf8');
+    const meta = JSON.parse(raw);
+    return Array.isArray(meta.scenes) ? meta.scenes.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function importWhiskFrames() {
   console.log('📂 WHISK_DOWNLOAD_DIR:', WHISK_DOWNLOAD_DIR);
   console.log('🎬 FRAMES_DIR:', FRAMES_DIR);
@@ -37,14 +47,16 @@ export async function importWhiskFrames() {
   ensureDir(WHISK_DOWNLOAD_DIR);
   ensureDir(FRAMES_DIR);
 
-  // limpa frames antigos
+  const scenesCount = readScenesCount();
+
+  // limpa frames antigos na pasta do projeto
   const oldFrames = fs.readdirSync(FRAMES_DIR);
   for (const file of oldFrames) {
     fs.unlinkSync(path.join(FRAMES_DIR, file));
   }
 
-  // lista imagens baixadas do Whisk
-  const files = fs
+  // imagens baixadas do Whisk
+  let files = fs
     .readdirSync(WHISK_DOWNLOAD_DIR)
     .filter(isImageFile)
     .map((name) => {
@@ -52,14 +64,19 @@ export async function importWhiskFrames() {
       const stat = fs.statSync(full);
       return { name, full, mtime: stat.mtimeMs };
     })
-    .sort((a, b) => a.mtime - b.mtime); // mais antigas primeiro
+    .sort((a, b) => a.mtime - b.mtime);
 
-  if (files.length === 0) {
+  if (!files.length) {
     console.log('⚠️ Nenhuma imagem encontrada em', WHISK_DOWNLOAD_DIR);
     return { imported: 0, frames: [] };
   }
 
-  console.log(`🖼️ Encontradas ${files.length} imagens do Whisk.`);
+  // pega só as N mais recentes, onde N = scenesCount (se for > 0)
+  if (scenesCount > 0 && files.length > scenesCount) {
+    files = files.slice(files.length - scenesCount);
+  }
+
+  console.log(`🖼️ Importando ${files.length} imagens do Whisk.`);
 
   const newFramePaths = [];
 
@@ -71,9 +88,16 @@ export async function importWhiskFrames() {
     fs.copyFileSync(file.full, dest);
     newFramePaths.push(dest);
     console.log(`➡️  ${file.name} -> ${frameName}`);
+
+    // remove original pra não reaproveitar em imports futuros
+    try {
+      fs.unlinkSync(file.full);
+    } catch (err) {
+      console.warn('Não foi possível apagar arquivo original:', file.full, err.message);
+    }
   });
 
-  // Atualiza scenes.generated.json com os novos caminhos
+  // atualiza metadata com os novos framePath
   let meta = null;
   try {
     if (fs.existsSync(metadataPath)) {
@@ -100,7 +124,7 @@ export async function importWhiskFrames() {
   return { imported: newFramePaths.length, frames: newFramePaths };
 }
 
-// permitir rodar standalone: node src/import-whisk-frames.js
+// permitir rodar standalone
 const isDirectRun =
   process.argv[1] &&
   pathToFileURL(process.argv[1]).href === import.meta.url;

@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -32,8 +32,19 @@
   </head>
   <body>
     <h1>My Whisk Helper</h1>
-    <textarea id="prompt" placeholder="Digite seu prompt..."></textarea>
+    <textarea
+      id="prompt"
+      rows="4"
+      cols="30"
+      placeholder="Digite um prompt"
+    ></textarea>
+    <br />
     <button id="send">Send to Whisk</button>
+
+    <hr />
+
+    <button id="run-batch">Run Batch from App</button>
+
     <script src="popup.js"></script>
   </body>
 </html>

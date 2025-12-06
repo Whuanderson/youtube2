@@ -13,6 +13,28 @@ export default function Home() {
   const [videoPath, setVideoPath] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const syncScenesFromServer = async () => {
+    try {
+      const res = await fetch('/api/scenes');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Falha ao carregar cenas do servidor');
+
+      // data.scenes já inclui prompt, duration e framePath
+      if (Array.isArray(data.scenes)) {
+        setScenes(
+          data.scenes.map((scene) => ({
+            prompt: scene.prompt || '',
+            duration: Number(scene.duration) > 0 ? Number(scene.duration) : 4,
+            framePath: scene.framePath || null,
+          })),
+        );
+      }
+    } catch (err) {
+      // se der erro, só loga – não quebra o fluxo
+      console.error('syncScenesFromServer erro:', err);
+    }
+  };
+
   const updateScene = (index, key, value) => {
     const next = scenes.map((scene, i) => (i === index ? { ...scene, [key]: value } : scene));
     setScenes(next);
@@ -27,7 +49,7 @@ export default function Home() {
   };
 
   const handleGenerate = async () => {
-    setStatus('Gerando frames...');
+    setStatus('Gerando frames (metadata)...');
     setLoading(true);
     try {
       const res = await fetch('/api/generate', {
@@ -37,7 +59,10 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Falha ao gerar frames');
-      setStatus(`Frames prontos em ${data.framesDir}. Ajuste as duracoes se quiser e depois renderize.`);
+
+      setStatus(`Metadata gerada em ${data.metadataPath || data.framesDir}. Agora gere imagens no Whisk e depois importe.`);
+      // atualiza cena do front com o que ficou no metadata (sem frame ainda)
+      await syncScenesFromServer();
     } catch (err) {
       setStatus(err.message);
     } finally {
@@ -90,6 +115,26 @@ export default function Home() {
     }
   };
 
+  const handleImportWhisk = async () => {
+    setStatus('Importando imagens do Whisk...');
+    setLoading(true);
+    try {
+      const res = await fetch('/api/import-whisk', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Falha ao importar imagens do Whisk');
+
+      setStatus(`Importadas ${data.imported || 0} imagens do Whisk para os frames.`);
+      await syncScenesFromServer();
+    } catch (err) {
+      setStatus(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   return (
     <div className="page">
       <div className="hero">
@@ -101,7 +146,10 @@ export default function Home() {
           </p>
           <div className="actions">
             <button type="button" onClick={handleGenerate} disabled={loading}>
-              Gerar frames
+              Gerar frames (metadata)
+            </button>
+            <button type="button" className="ghost" onClick={handleImportWhisk} disabled={loading}>
+              Importar imagens do Whisk
             </button>
             <button type="button" className="ghost" onClick={handleRender} disabled={loading || !audioPath}>
               Renderizar vídeo
@@ -135,6 +183,19 @@ export default function Home() {
         <div className="table">
           {scenes.map((scene, idx) => (
             <div key={idx} className="row">
+              {/* THUMB */}
+              <div className="col thumb">
+                {scene.framePath ? (
+                  <img
+                    src={`/api/frame?index=${idx}`}
+                    alt={`Cena ${idx + 1}`}
+                  />
+                ) : (
+                  <div className="thumb-placeholder">Sem imagem</div>
+                )}
+              </div>
+
+              {/* PROMPT */}
               <div className="col prompt">
                 <input
                   value={scene.prompt}
@@ -142,6 +203,8 @@ export default function Home() {
                   placeholder="Prompt para o Whisk"
                 />
               </div>
+
+              {/* DURAÇÃO */}
               <div className="col duration">
                 <input
                   type="number"
@@ -151,12 +214,15 @@ export default function Home() {
                 />
                 <span>s</span>
               </div>
+
+              {/* REMOVER */}
               <button type="button" className="ghost danger" onClick={() => removeScene(idx)}>
                 Remover
               </button>
             </div>
           ))}
         </div>
+
       </div>
 
       <style jsx global>{`
@@ -295,12 +361,38 @@ export default function Home() {
           flex-direction: column;
           gap: 10px;
         }
-        .row {
+       .row {
           display: grid;
-          grid-template-columns: 1fr 140px 110px;
+          grid-template-columns: 140px 1fr 140px 110px; /* thumb | prompt | duração | remover */
           gap: 10px;
           align-items: center;
         }
+
+        .col.thumb {
+          width: 140px;
+          height: 80px;
+          border-radius: 12px;
+          overflow: hidden;
+          background: rgba(15, 23, 42, 0.9);
+          border: 1px solid #1f2937;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .col.thumb img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .thumb-placeholder {
+          font-size: 11px;
+          color: #64748b;
+          text-align: center;
+          padding: 4px;
+        }
+
         .col.prompt input {
           width: 100%;
           padding: 12px;
@@ -325,17 +417,15 @@ export default function Home() {
           border: none;
           color: inherit;
         }
+
         @media (max-width: 900px) {
-          .hero {
-            grid-template-columns: 1fr;
-          }
           .row {
             grid-template-columns: 1fr;
           }
-          .col.duration {
+          .col.thumb {
             width: 100%;
           }
-        }
+        }        
       `}</style>
     </div>
   );

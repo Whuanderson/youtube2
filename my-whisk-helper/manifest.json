@@ -4,12 +4,17 @@
   "version": "1.0.0",
   "manifest_version": 3,
   "permissions": ["tabs", "scripting", "downloads"],
-  "host_permissions": ["https://labs.google/*/tools/whisk/*"],
+  "host_permissions": [
+    "https://labs.google/*/tools/whisk/*",
+    "https://labs.google/*",
+    "http://localhost:3000/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_title": "My Whisk Helper"
   },
   "content_scripts": [
     {
@@ -17,7 +22,8 @@
         "https://labs.google/*/tools/whisk",
         "https://labs.google/*/tools/whisk*"
       ],
-      "js": ["content-whisk.js"]
+      "js": ["content-whisk.js"],
+      "run_at": "document_idle"
     }
   ]
 }

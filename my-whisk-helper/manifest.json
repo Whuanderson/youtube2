@@ -1,0 +1,23 @@
+{
+  "name": "My Whisk Helper",
+  "description": "Helper extension to send prompts from popup to Google Labs Whisk.",
+  "version": "1.0.0",
+  "manifest_version": 3,
+  "permissions": ["tabs", "scripting", "downloads"],
+  "host_permissions": ["https://labs.google/*/tools/whisk/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://labs.google/*/tools/whisk",
+        "https://labs.google/*/tools/whisk*"
+      ],
+      "js": ["content-whisk.js"]
+    }
+  ]
+}

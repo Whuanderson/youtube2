@@ -6,6 +6,7 @@
   "scripts": {
     "build:frames": "node src/generate-images.js",
     "render:video": "node src/render-video.js",
+    "import:whisk": "node src/import-whisk-frames.js",
     "demo": "node src/index.js",
     "dev": "next dev",
     "build": "next build",

@@ -22,7 +22,7 @@ chrome.downloads.onDeterminingFilename.addListener((item, suggest) => {
 
   suggest({
     filename: newName,
-    conflictAction: 'overwrite',
+    conflictAction: 'uniquify',
   });
 });
 

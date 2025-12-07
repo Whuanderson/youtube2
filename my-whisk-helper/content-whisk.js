@@ -67,6 +67,9 @@ function clickGenerateButton() {
   return true;
 }
 
+
+
+
 function findDownloadButtons() {
   const btns = Array.from(document.querySelectorAll('button'));
   return btns.filter((btn) => {
@@ -75,15 +78,32 @@ function findDownloadButtons() {
   });
 }
 
-function startDownloadWatcherOnce(onDone, timeoutMs = 25000, expectedDownloads = 2) {
+function findImageForButton(btn) {
+  // Sobe na árvore de DOM procurando o primeiro <img> relevante
+  let node = btn;
+  while (node && node !== document.body) {
+    if (node.querySelector) {
+      const img =
+        node.querySelector('img') ||
+        node.querySelector('picture img');
+      if (img) return img;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
+
+function startDownloadWatcherOnce(onDone, timeoutMs = 25000, expectedDownloads = 1) {
   console.log('[My Whisk Helper] Iniciando watcher de downloads...');
 
   const root = document.body;
 
-  // botões que já existiam ANTES desta geração (não queremos clicar neles)
-  const existing = new Set(findDownloadButtons());
+  // Botões de download que já existiam ANTES desta cena
+  const existingButtons = new Set(findDownloadButtons());
 
-  const clicked = new WeakSet();
+  // Controle desta cena
+  const clickedButtons = new WeakSet();
+  const clickedImages = new WeakSet(); // ⬅️ dedupe por <img>
   let clickedCount = 0;
   let finished = false;
   let observer;
@@ -91,29 +111,40 @@ function startDownloadWatcherOnce(onDone, timeoutMs = 25000, expectedDownloads =
   const handleNodes = () => {
     const all = findDownloadButtons();
 
-    // candidatos = botões novos (não estavam em existing) e ainda não clicados
-    const candidates = all.filter((btn) => !existing.has(btn) && !clicked.has(btn));
+    // Candidatos = botões que surgiram depois + ainda não clicados
+    const candidates = all.filter(
+      (btn) => !existingButtons.has(btn) && !clickedButtons.has(btn),
+    );
 
     if (!candidates.length) return;
 
     console.log(
-      `[My Whisk Helper] Encontrados ${candidates.length} novos botões de download.`
+      `[My Whisk Helper] Encontrados ${candidates.length} novos botões de download.`,
     );
 
     candidates.forEach((btn) => {
-      clicked.add(btn);
+      const imgEl = findImageForButton(btn);
+
+      // Se já baixamos essa imagem (mesmo que haja vários botões), pula
+      if (imgEl && clickedImages.has(imgEl)) {
+        return;
+      }
+
+      clickedButtons.add(btn);
+      if (imgEl) clickedImages.add(imgEl);
+
       clickedCount += 1;
       console.log('[My Whisk Helper] Clicando download #', clickedCount);
       btn.click();
     });
 
-    // Se já clicamos o esperado para esta cena, encerramos
+    // Já clicamos o número esperado de imagens desta cena?
     if (!finished && clickedCount >= expectedDownloads) {
       finished = true;
       setTimeout(() => {
         if (observer) observer.disconnect();
         console.log(
-          '[My Whisk Helper] Downloads desta cena concluídos, encerrando watcher.'
+          '[My Whisk Helper] Downloads desta cena concluídos, encerrando watcher.',
         );
         onDone?.();
       }, 2000);
@@ -123,20 +154,20 @@ function startDownloadWatcherOnce(onDone, timeoutMs = 25000, expectedDownloads =
   observer = new MutationObserver(handleNodes);
   observer.observe(root, { childList: true, subtree: true });
 
-  // Não chamamos handleNodes() imediatamente para NÃO pegar imagens antigas
-
-  // timeout de segurança
+  // Timeout de segurança
   setTimeout(() => {
     if (!finished) {
       finished = true;
       if (observer) observer.disconnect();
       console.log(
-        '[My Whisk Helper] Timeout de downloads; seguindo para a próxima cena.'
+        '[My Whisk Helper] Timeout de downloads; seguindo para a próxima cena.',
       );
       onDone?.();
     }
   }, timeoutMs);
 }
+
+
 
 // ---------- batch controlado pelo painel ----------
 
@@ -187,14 +218,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // ainda permite o uso direto do popup (um prompt só)
   if (message.type === 'SET_WHISK_PROMPT') {
-    const ok = setPromptInBox(message.prompt || '');
-    if (ok && message.autoGenerate) {
-      clickGenerateButton();
-      startDownloadWatcherOnce();
-    }
-    sendResponse?.({ ok });
-    return;
+  const ok = setPromptInBox(message.prompt || '');
+  if (ok && message.autoGenerate) {
+    clickGenerateButton();
+    // aqui basta 1 imagem:
+    startDownloadWatcherOnce();
   }
+  sendResponse?.({ ok });
+  return;
+}
 
   // chamado pelo background quando o painel clicar em "Gerar frames"
   if (message.type === 'RUN_BATCH_WITH_SCENES') {

@@ -67,42 +67,54 @@ function clickGenerateButton() {
   return true;
 }
 
-function startDownloadWatcherOnce(onDone, timeoutMs = 25000) {
+function findDownloadButtons() {
+  const btns = Array.from(document.querySelectorAll('button'));
+  return btns.filter((btn) => {
+    const text = (btn.textContent || '').trim().toLowerCase();
+    return text === 'download' || text.includes('download');
+  });
+}
+
+function startDownloadWatcherOnce(onDone, timeoutMs = 25000, expectedDownloads = 2) {
   console.log('[My Whisk Helper] Iniciando watcher de downloads...');
 
   const root = document.body;
+
+  // botões que já existiam ANTES desta geração (não queremos clicar neles)
+  const existing = new Set(findDownloadButtons());
+
   const clicked = new WeakSet();
+  let clickedCount = 0;
   let finished = false;
   let observer;
 
   const handleNodes = () => {
-    const nodes = Array.from(
-      document.querySelectorAll(
-        '[aria-label="download"], [aria-label="Download"], [aria-label="Baixar"]'
-      )
-    );
+    const all = findDownloadButtons();
 
-    if (!nodes.length) return;
+    // candidatos = botões novos (não estavam em existing) e ainda não clicados
+    const candidates = all.filter((btn) => !existing.has(btn) && !clicked.has(btn));
+
+    if (!candidates.length) return;
 
     console.log(
-      `[My Whisk Helper] Encontrados ${nodes.length} elementos com aria-label de download.`
+      `[My Whisk Helper] Encontrados ${candidates.length} novos botões de download.`
     );
 
-    let anyClicked = false;
-
-    nodes.forEach((node) => {
-      const btn = node.closest('button') || node;
-      if (clicked.has(btn)) return;
+    candidates.forEach((btn) => {
       clicked.add(btn);
+      clickedCount += 1;
+      console.log('[My Whisk Helper] Clicando download #', clickedCount);
       btn.click();
-      anyClicked = true;
     });
 
-    if (anyClicked && !finished) {
+    // Se já clicamos o esperado para esta cena, encerramos
+    if (!finished && clickedCount >= expectedDownloads) {
       finished = true;
       setTimeout(() => {
         if (observer) observer.disconnect();
-        console.log('[My Whisk Helper] Downloads clicados, encerrando watcher.');
+        console.log(
+          '[My Whisk Helper] Downloads desta cena concluídos, encerrando watcher.'
+        );
         onDone?.();
       }, 2000);
     }
@@ -111,8 +123,7 @@ function startDownloadWatcherOnce(onDone, timeoutMs = 25000) {
   observer = new MutationObserver(handleNodes);
   observer.observe(root, { childList: true, subtree: true });
 
-  // tenta clicar em downloads que já estejam na tela
-  handleNodes();
+  // Não chamamos handleNodes() imediatamente para NÃO pegar imagens antigas
 
   // timeout de segurança
   setTimeout(() => {
@@ -156,7 +167,7 @@ async function runBatchCore(scenes) {
       await new Promise((resolve) => {
         startDownloadWatcherOnce(() => {
           setTimeout(resolve, 3000); // respiro depois do clique nos downloads
-        });
+        }, 25000, 2); // ⬅️ 2 downloads esperados por cena
       });
 
       // pequeno intervalo entre cenas

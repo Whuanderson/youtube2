@@ -73,5 +73,4 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // resposta assíncrona
   }
 
-  // (outros tipos de mensagem poderiam ser tratados aqui)
 });

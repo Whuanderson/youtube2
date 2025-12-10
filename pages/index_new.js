@@ -10,7 +10,7 @@ export default function Home() {
   // Separação: prompts vs cenas geradas
   const [prompts, setPrompts] = useState(defaultPrompts);
   const [generatedScenes, setGeneratedScenes] = useState([]);
-
+  
   const [status, setStatus] = useState('');
   const [audioPath, setAudioPath] = useState('');
   const [videoPath, setVideoPath] = useState('');
@@ -60,7 +60,7 @@ export default function Home() {
 
   // Funções para manipular CENAS GERADAS (depois de importar)
   const updateGeneratedScene = (index, key, value) => {
-    const next = generatedScenes.map((scene, i) =>
+    const next = generatedScenes.map((scene, i) => 
       (i === index ? { ...scene, [key]: value } : scene)
     );
     setGeneratedScenes(next);
@@ -74,6 +74,7 @@ export default function Home() {
     setStatus('Gerando frames...');
     setLoading(true);
     try {
+      // Converte prompts para formato de scenes com duração padrão
       const scenesToGenerate = prompts.map(p => ({
         prompt: p.prompt,
         duration: 4
@@ -87,8 +88,9 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Falha ao gerar frames');
 
-      setStatus(`Frames enviados para o Whisk. Aguardando downloads...`);
+      setStatus(`Frames gerados! Aguarde o download das imagens...`);
 
+      // 🔔 AVISA A EXTENSÃO: "roda o batch com essas cenas"
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('MY_WHISK_RUN_BATCH', {
@@ -97,13 +99,17 @@ export default function Home() {
         );
       }
 
+      // Após alguns segundos, importa automaticamente
+      setTimeout(async () => {
+        await handleAutoImport();
+      }, 3000);
+
     } catch (err) {
       setStatus(err.message);
     } finally {
       setLoading(false);
     }
   };
-
 
   const handleAutoImport = async () => {
     setStatus('Importando imagens do Whisk automaticamente...');
@@ -123,22 +129,6 @@ export default function Home() {
       setLoading(false);
     }
   };
-
-  // Quando a extensão avisar que o batch terminou, importa as imagens
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const onBatchDone = (event) => {
-      console.log('[Studio] MY_WHISK_BATCH_DONE recebido:', event.detail);
-      // Aqui você pode, se quiser, conferir se downloads == prompts.length * 2
-      // e mostrar um alerta se estiver diferente.
-      handleAutoImport();
-    };
-
-    window.addEventListener('MY_WHISK_BATCH_DONE', onBatchDone);
-    return () => window.removeEventListener('MY_WHISK_BATCH_DONE', onBatchDone);
-  }, [handleAutoImport]);
-
 
   const handleAudioUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -243,9 +233,9 @@ export default function Home() {
                 placeholder="Digite o prompt para o Whisk..."
                 className="prompt-input"
               />
-              <button
-                type="button"
-                className="ghost danger small"
+              <button 
+                type="button" 
+                className="ghost danger small" 
                 onClick={() => removePrompt(idx)}
               >
                 ✕
@@ -334,9 +324,9 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    className="ghost danger"
+                  <button 
+                    type="button" 
+                    className="ghost danger" 
                     onClick={() => removeGeneratedScene(idx)}
                   >
                     Remover cena

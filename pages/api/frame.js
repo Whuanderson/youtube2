@@ -9,9 +9,35 @@ export default function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const index = Number(req.query.index);
-  if (Number.isNaN(index) || index < 0) {
-    return res.status(400).json({ error: 'index inválido' });
+  const { index, path: framePath } = req.query;
+
+  // Modo 1: Buscar por path direto (novo - tempo real)
+  if (framePath) {
+    try {
+      if (!fs.existsSync(framePath)) {
+        return res.status(404).json({ error: 'Arquivo não encontrado' });
+      }
+
+      const ext = path.extname(framePath).toLowerCase();
+      let mime = 'image/jpeg';
+      if (ext === '.png') mime = 'image/png';
+      if (ext === '.webp') mime = 'image/webp';
+
+      res.setHeader('Content-Type', mime);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      const stream = fs.createReadStream(framePath);
+      stream.pipe(res);
+      return;
+    } catch (err) {
+      console.error('[/api/frame] Erro (path mode):', err);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  // Modo 2: Buscar por index no metadata (legado)
+  const idx = Number(index);
+  if (Number.isNaN(idx) || idx < 0) {
+    return res.status(400).json({ error: 'index ou path inválido' });
   }
 
   try {
@@ -22,7 +48,7 @@ export default function handler(req, res) {
     const raw = fs.readFileSync(metadataPath, 'utf8');
     const meta = JSON.parse(raw);
     const scenes = Array.isArray(meta.scenes) ? meta.scenes : [];
-    const scene = scenes[index];
+    const scene = scenes[idx];
 
     if (!scene || !scene.framePath) {
       return res.status(404).json({ error: 'framePath não encontrado para esta cena' });

@@ -33,7 +33,8 @@ export default function Home() {
       
       // Atualiza as cenas geradas com framePath e duração
       if (Array.isArray(data.scenes) && data.scenes.length > 0) {
-        const scenes = data.scenes.map((scene) => ({
+        const scenes = data.scenes.map((scene, idx) => ({
+          id: scene.framePath || `scene-${idx}-${Date.now()}`, // ID único baseado no framePath
           prompt: scene.prompt || '',
           duration: Number(scene.duration) > 0 ? Number(scene.duration) : 4,
           framePath: scene.framePath || null,
@@ -328,13 +329,14 @@ export default function Home() {
 
           <div className="scenes-grid">
             {generatedScenes.map((scene, idx) => (
-              <div key={idx} className="scene-card">
+              <div key={scene.id || idx} className="scene-card">
                 {/* Thumbnail */}
                 <div className="scene-thumb">
                   {scene.framePath ? (
                     <img
-                      src={`/api/frame?index=${idx}`}
+                      src={`/api/frame?index=${idx}&v=${scene.id}`}
                       alt={`Cena ${idx + 1}`}
+                      key={`${scene.id}-${idx}`}
                     />
                   ) : (
                     <div className="thumb-placeholder">Carregando...</div>

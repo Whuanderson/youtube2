@@ -198,7 +198,7 @@ async function runBatchCore(scenes) {
       await new Promise((resolve) => {
         startDownloadWatcherOnce(() => {
           setTimeout(resolve, 3000); // respiro depois do clique nos downloads
-        }, 25000, 2); // ⬅️ 2 downloads esperados por cena
+        }, 25000, 2); // ⬅️ 2 downloads por cena (Whisk gera 2 imagens)
       });
 
       // pequeno intervalo entre cenas

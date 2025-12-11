@@ -8,7 +8,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = await importWhiskFrames();
+    // Aguarda todas as imagens serem baixadas antes de importar
+    const result = await importWhiskFrames(true);
     return res.status(200).json({ ok: true, ...result });
   } catch (err) {
     console.error('[/api/import-whisk] Erro:', err);

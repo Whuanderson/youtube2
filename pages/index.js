@@ -10,7 +10,7 @@ export default function Home() {
   // Separação: prompts vs cenas geradas
   const [prompts, setPrompts] = useState(defaultPrompts);
   const [generatedScenes, setGeneratedScenes] = useState([]);
-
+  
   const [status, setStatus] = useState('');
   const [audioPath, setAudioPath] = useState('');
   const [videoPath, setVideoPath] = useState('');
@@ -23,24 +23,29 @@ export default function Home() {
 
   const syncScenesFromServer = async () => {
     try {
+      console.log('🔄 Sincronizando cenas do servidor...');
       const res = await fetch('/api/scenes');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Falha ao carregar cenas do servidor');
 
+      console.log('📦 Cenas recebidas:', data.scenes?.length || 0);
+      
       // Atualiza as cenas geradas com framePath e duração
       if (Array.isArray(data.scenes) && data.scenes.length > 0) {
-        setGeneratedScenes(
-          data.scenes.map((scene) => ({
-            prompt: scene.prompt || '',
-            duration: Number(scene.duration) > 0 ? Number(scene.duration) : 4,
-            framePath: scene.framePath || null,
-            effect: scene.effect || 'none',
-            animation: scene.animation || 'none',
-          })),
-        );
+        const scenes = data.scenes.map((scene) => ({
+          prompt: scene.prompt || '',
+          duration: Number(scene.duration) > 0 ? Number(scene.duration) : 4,
+          framePath: scene.framePath || null,
+          effect: scene.effect || 'none',
+          animation: scene.animation || 'none',
+        }));
+        setGeneratedScenes(scenes);
+        console.log('✅ Cenas atualizadas no estado:', scenes.length);
+      } else {
+        console.warn('⚠️ Nenhuma cena retornada do servidor');
       }
     } catch (err) {
-      console.error('syncScenesFromServer erro:', err);
+      console.error('❌ syncScenesFromServer erro:', err);
     }
   };
 
@@ -60,7 +65,7 @@ export default function Home() {
 
   // Funções para manipular CENAS GERADAS (depois de importar)
   const updateGeneratedScene = (index, key, value) => {
-    const next = generatedScenes.map((scene, i) =>
+    const next = generatedScenes.map((scene, i) => 
       (i === index ? { ...scene, [key]: value } : scene)
     );
     setGeneratedScenes(next);
@@ -74,6 +79,7 @@ export default function Home() {
     setStatus('Gerando frames...');
     setLoading(true);
     try {
+      // Converte prompts para formato de scenes com duração padrão
       const scenesToGenerate = prompts.map(p => ({
         prompt: p.prompt,
         duration: 4
@@ -87,8 +93,10 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Falha ao gerar frames');
 
-      setStatus(`Frames enviados para o Whisk. Aguardando downloads...`);
+      const totalImages = scenesToGenerate.length * 2; // Whisk gera 2 por prompt
+      setStatus(`Frames gerados! Aguarde o download de ${totalImages} imagens...`);
 
+      // 🔔 AVISA A EXTENSÃO: "roda o batch com essas cenas"
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('MY_WHISK_RUN_BATCH', {
@@ -97,6 +105,14 @@ export default function Home() {
         );
       }
 
+      // Calcula tempo de espera baseado no número de cenas (≈20s por cena + 10s buffer)
+      const estimatedTime = (scenesToGenerate.length * 20 + 10) * 1000;
+      setStatus(`Aguardando downloads (${Math.ceil(estimatedTime/1000)}s)... Depois clique em "📥 Importar do Download"`);
+      
+      setTimeout(async () => {
+        await handleAutoImport();
+      }, estimatedTime);
+
     } catch (err) {
       setStatus(err.message);
     } finally {
@@ -104,9 +120,8 @@ export default function Home() {
     }
   };
 
-
   const handleAutoImport = async () => {
-    setStatus('Importando imagens do Whisk automaticamente...');
+    setStatus('🔍 Buscando imagens do Whisk nos diretórios de download...');
     setLoading(true);
     try {
       const res = await fetch('/api/import-whisk', {
@@ -115,30 +130,26 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Falha ao importar imagens do Whisk');
 
-      setStatus(`✅ ${data.imported || 0} imagens importadas! Configure duração e efeitos abaixo.`);
+      if (data.imported === 0) {
+        setStatus('⚠️ Nenhuma imagem encontrada. Certifique-se de que as imagens do Whisk foram baixadas. Verifique sua pasta Downloads.');
+        return;
+      }
+
+      const usedImages = data.downloadedFiles?.slice(0, 3).join(', ') || 'imagens';
+      const moreCount = data.downloadedFiles?.length > 3 ? ` e mais ${data.downloadedFiles.length - 3}` : '';
+      setStatus(`✅ ${data.imported || 0} imagens importadas (${usedImages}${moreCount})! Sincronizando...`);
+      
+      console.log('🔄 Chamando syncScenesFromServer...');
       await syncScenesFromServer();
+      
+      setStatus(`✅ ${data.imported || 0} imagens prontas! Configure duração e efeitos abaixo.`);
     } catch (err) {
-      setStatus(err.message);
+      console.error('❌ Erro no import:', err);
+      setStatus(`❌ Erro: ${err.message}`);
     } finally {
       setLoading(false);
     }
   };
-
-  // Quando a extensão avisar que o batch terminou, importa as imagens
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const onBatchDone = (event) => {
-      console.log('[Studio] MY_WHISK_BATCH_DONE recebido:', event.detail);
-      // Aqui você pode, se quiser, conferir se downloads == prompts.length * 2
-      // e mostrar um alerta se estiver diferente.
-      handleAutoImport();
-    };
-
-    window.addEventListener('MY_WHISK_BATCH_DONE', onBatchDone);
-    return () => window.removeEventListener('MY_WHISK_BATCH_DONE', onBatchDone);
-  }, [handleAutoImport]);
-
 
   const handleAudioUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -203,7 +214,7 @@ export default function Home() {
             <button type="button" onClick={handleGenerate} disabled={loading || prompts.length === 0}>
               🎨 Gerar e Baixar Imagens
             </button>
-            <button type="button" className="ghost" onClick={handleRender} disabled={loading || !audioPath || generatedScenes.length === 0}>
+            <button type="button" onClick={handleRender} disabled={loading || !audioPath || generatedScenes.length === 0}>
               🎬 Renderizar Vídeo
             </button>
           </div>
@@ -228,9 +239,14 @@ export default function Home() {
             <p className="label">📝 Prompts para Gerar Imagens</p>
             <p className="tiny">Adicione ou edite os prompts que serão enviados ao Whisk.</p>
           </div>
-          <button type="button" onClick={addPrompt} className="ghost">
-            + Adicionar prompt
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="button" onClick={handleAutoImport} disabled={loading} style={{ fontSize: '0.875rem' }}>
+              📥 Importar do Download
+            </button>
+            <button type="button" onClick={addPrompt} className="ghost">
+              + Adicionar prompt
+            </button>
+          </div>
         </div>
 
         <div className="prompts-list">
@@ -243,9 +259,9 @@ export default function Home() {
                 placeholder="Digite o prompt para o Whisk..."
                 className="prompt-input"
               />
-              <button
-                type="button"
-                className="ghost danger small"
+              <button 
+                type="button" 
+                className="ghost danger small" 
                 onClick={() => removePrompt(idx)}
               >
                 ✕
@@ -334,9 +350,9 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    className="ghost danger"
+                  <button 
+                    type="button" 
+                    className="ghost danger" 
                     onClick={() => removeGeneratedScene(idx)}
                   >
                     Remover cena

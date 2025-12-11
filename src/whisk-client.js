@@ -16,41 +16,21 @@ function run(command, args) {
 }
 
 async function generatePlaceholderImage({ prompt, outputPath, width, height }) {
-  // Placeholder: gera uma imagem lisa via ffmpeg para manter o pipeline utilizável.
+  // Placeholder: gera uma imagem lisa via ffmpeg (sem texto para evitar erro Fontconfig)
   const color = '0x1e1e1e';
-  const label = prompt ? prompt.slice(0, 40).replace(/[^a-zA-Z0-9 ]/g, '') : 'whisk';
-  const drawText = `drawtext=text='${label}':fontcolor=white:fontsize=32:x=(w-tw)/2:y=(h-th)/2`;
 
-  try {
-    await run('ffmpeg', [
-      '-y',
-      '-f',
-      'lavfi',
-      '-i',
-      `color=c=${color}:s=${width}x${height}:d=1`,
-      '-vf',
-      drawText,
-      '-frames:v',
-      '1',
-      '-update',
-      '1',
-      outputPath,
-    ]);
-  } catch (err) {
-    // Fallback sem texto se drawtext falhar.
-    await run('ffmpeg', [
-      '-y',
-      '-f',
-      'lavfi',
-      '-i',
-      `color=c=${color}:s=${width}x${height}:d=1`,
-      '-frames:v',
-      '1',
-      '-update',
-      '1',
-      outputPath,
-    ]);
-  }
+  await run('ffmpeg', [
+    '-y',
+    '-f',
+    'lavfi',
+    '-i',
+    `color=c=${color}:s=${width}x${height}:d=1`,
+    '-frames:v',
+    '1',
+    '-update',
+    '1',
+    outputPath,
+  ]);
 }
 
 /**

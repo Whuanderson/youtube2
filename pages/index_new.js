@@ -23,24 +23,29 @@ export default function Home() {
 
   const syncScenesFromServer = async () => {
     try {
+      console.log('🔄 Sincronizando cenas do servidor...');
       const res = await fetch('/api/scenes');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Falha ao carregar cenas do servidor');
 
+      console.log('📦 Cenas recebidas:', data.scenes?.length || 0);
+      
       // Atualiza as cenas geradas com framePath e duração
       if (Array.isArray(data.scenes) && data.scenes.length > 0) {
-        setGeneratedScenes(
-          data.scenes.map((scene) => ({
-            prompt: scene.prompt || '',
-            duration: Number(scene.duration) > 0 ? Number(scene.duration) : 4,
-            framePath: scene.framePath || null,
-            effect: scene.effect || 'none',
-            animation: scene.animation || 'none',
-          })),
-        );
+        const scenes = data.scenes.map((scene) => ({
+          prompt: scene.prompt || '',
+          duration: Number(scene.duration) > 0 ? Number(scene.duration) : 4,
+          framePath: scene.framePath || null,
+          effect: scene.effect || 'none',
+          animation: scene.animation || 'none',
+        }));
+        setGeneratedScenes(scenes);
+        console.log('✅ Cenas atualizadas no estado:', scenes.length);
+      } else {
+        console.warn('⚠️ Nenhuma cena retornada do servidor');
       }
     } catch (err) {
-      console.error('syncScenesFromServer erro:', err);
+      console.error('❌ syncScenesFromServer erro:', err);
     }
   };
 
@@ -88,7 +93,8 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Falha ao gerar frames');
 
-      setStatus(`Frames gerados! Aguarde o download das imagens...`);
+      const totalImages = scenesToGenerate.length * 2; // Whisk gera 2 por prompt
+      setStatus(`Frames gerados! Aguarde o download de ${totalImages} imagens...`);
 
       // 🔔 AVISA A EXTENSÃO: "roda o batch com essas cenas"
       if (typeof window !== 'undefined') {
@@ -99,10 +105,13 @@ export default function Home() {
         );
       }
 
-      // Após alguns segundos, importa automaticamente
+      // Calcula tempo de espera baseado no número de cenas (≈20s por cena + 10s buffer)
+      const estimatedTime = (scenesToGenerate.length * 20 + 10) * 1000;
+      setStatus(`Aguardando downloads (${Math.ceil(estimatedTime/1000)}s)... Depois clique em "📥 Importar do Download"`);
+      
       setTimeout(async () => {
         await handleAutoImport();
-      }, 3000);
+      }, estimatedTime);
 
     } catch (err) {
       setStatus(err.message);
@@ -112,7 +121,7 @@ export default function Home() {
   };
 
   const handleAutoImport = async () => {
-    setStatus('Importando imagens do Whisk automaticamente...');
+    setStatus('🔍 Buscando imagens do Whisk nos diretórios de download...');
     setLoading(true);
     try {
       const res = await fetch('/api/import-whisk', {
@@ -121,10 +130,22 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Falha ao importar imagens do Whisk');
 
-      setStatus(`✅ ${data.imported || 0} imagens importadas! Configure duração e efeitos abaixo.`);
+      if (data.imported === 0) {
+        setStatus('⚠️ Nenhuma imagem encontrada. Certifique-se de que as imagens do Whisk foram baixadas. Verifique sua pasta Downloads.');
+        return;
+      }
+
+      const usedImages = data.downloadedFiles?.slice(0, 3).join(', ') || 'imagens';
+      const moreCount = data.downloadedFiles?.length > 3 ? ` e mais ${data.downloadedFiles.length - 3}` : '';
+      setStatus(`✅ ${data.imported || 0} imagens importadas (${usedImages}${moreCount})! Sincronizando...`);
+      
+      console.log('🔄 Chamando syncScenesFromServer...');
       await syncScenesFromServer();
+      
+      setStatus(`✅ ${data.imported || 0} imagens prontas! Configure duração e efeitos abaixo.`);
     } catch (err) {
-      setStatus(err.message);
+      console.error('❌ Erro no import:', err);
+      setStatus(`❌ Erro: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -193,7 +214,7 @@ export default function Home() {
             <button type="button" onClick={handleGenerate} disabled={loading || prompts.length === 0}>
               🎨 Gerar e Baixar Imagens
             </button>
-            <button type="button" className="ghost" onClick={handleRender} disabled={loading || !audioPath || generatedScenes.length === 0}>
+            <button type="button" onClick={handleRender} disabled={loading || !audioPath || generatedScenes.length === 0}>
               🎬 Renderizar Vídeo
             </button>
           </div>
@@ -218,9 +239,14 @@ export default function Home() {
             <p className="label">📝 Prompts para Gerar Imagens</p>
             <p className="tiny">Adicione ou edite os prompts que serão enviados ao Whisk.</p>
           </div>
-          <button type="button" onClick={addPrompt} className="ghost">
-            + Adicionar prompt
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="button" onClick={handleAutoImport} disabled={loading} style={{ fontSize: '0.875rem' }}>
+              📥 Importar do Download
+            </button>
+            <button type="button" onClick={addPrompt} className="ghost">
+              + Adicionar prompt
+            </button>
+          </div>
         </div>
 
         <div className="prompts-list">

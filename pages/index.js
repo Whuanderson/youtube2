@@ -13,6 +13,7 @@ export default function Home() {
   
   const [status, setStatus] = useState('');
   const [audioPath, setAudioPath] = useState('');
+  const [audioDuration, setAudioDuration] = useState(0);
   const [videoPath, setVideoPath] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -73,6 +74,20 @@ export default function Home() {
 
   const removeGeneratedScene = (index) => {
     setGeneratedScenes(generatedScenes.filter((_, i) => i !== index));
+  };
+
+  const moveSceneUp = (index) => {
+    if (index === 0) return;
+    const next = [...generatedScenes];
+    [next[index - 1], next[index]] = [next[index], next[index - 1]];
+    setGeneratedScenes(next);
+  };
+
+  const moveSceneDown = (index) => {
+    if (index === generatedScenes.length - 1) return;
+    const next = [...generatedScenes];
+    [next[index], next[index + 1]] = [next[index + 1], next[index]];
+    setGeneratedScenes(next);
   };
 
   const handleGenerate = async () => {
@@ -163,7 +178,8 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Falha ao enviar audio');
       setAudioPath(data.audioPath);
-      setStatus(`Audio armazenado em ${data.audioPath}`);
+      setAudioDuration(data.duration || 0);
+      setStatus(`✅ Áudio carregado: ${data.duration}s de duração`);
     } catch (err) {
       setStatus(err.message);
     } finally {
@@ -182,20 +198,33 @@ export default function Home() {
       return;
     }
 
-    setStatus('Renderizando video...');
+    setStatus('Salvando configurações...');
     setLoading(true);
     try {
+      // Primeiro salva as cenas no metadata
+      const saveRes = await fetch('/api/save-scenes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scenes: generatedScenes }),
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) throw new Error(saveData.error || 'Falha ao salvar cenas');
+      
+      console.log('✅ Cenas salvas:', saveData.saved);
+      
+      // Agora renderiza usando o metadata salvo
+      setStatus('Renderizando video...');
       const res = await fetch('/api/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audioPath, scenes: generatedScenes }),
+        body: JSON.stringify({ audioPath }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Falha ao renderizar video');
       setVideoPath(data.videoPath);
-      setStatus(`Video criado em ${data.videoPath}`);
+      setStatus(`✅ Video criado: ${data.videoPath}`);
     } catch (err) {
-      setStatus(err.message);
+      setStatus(`❌ ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -223,7 +252,23 @@ export default function Home() {
         <div className="card upload">
           <p className="label">Áudio</p>
           <input type="file" accept="audio/*" onChange={handleAudioUpload} />
-          {audioPath ? <p className="tiny">Usando: {audioPath}</p> : <p className="tiny">Envie um .mp3/.wav</p>}
+          {audioPath ? (
+            <div>
+              <p className="tiny">✅ Áudio carregado</p>
+              {audioDuration > 0 && (
+                <p className="tiny" style={{ fontWeight: 'bold', color: '#4CAF50' }}>
+                  ⏱️ Duração: {audioDuration}s
+                  {generatedScenes.length > 0 && (
+                    <span style={{ marginLeft: '8px', color: '#666' }}>
+                      | Cenas: {generatedScenes.reduce((sum, s) => sum + s.duration, 0)}s
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="tiny">Envie um .mp3/.wav</p>
+          )}
           {videoPath && (
             <a className="download" href={`/api/download?file=${encodeURIComponent('final.mp4')}`}>
               📥 Baixar vídeo
@@ -350,13 +395,34 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <button 
-                    type="button" 
-                    className="ghost danger" 
-                    onClick={() => removeGeneratedScene(idx)}
-                  >
-                    Remover cena
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <button 
+                      type="button" 
+                      className="ghost" 
+                      onClick={() => moveSceneUp(idx)}
+                      disabled={idx === 0}
+                      title="Mover para cima"
+                    >
+                      ⬆️
+                    </button>
+                    <button 
+                      type="button" 
+                      className="ghost" 
+                      onClick={() => moveSceneDown(idx)}
+                      disabled={idx === generatedScenes.length - 1}
+                      title="Mover para baixo"
+                    >
+                      ⬇️
+                    </button>
+                    <button 
+                      type="button" 
+                      className="ghost danger" 
+                      onClick={() => removeGeneratedScene(idx)}
+                      style={{ marginLeft: 'auto' }}
+                    >
+                      🗑️ Remover
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

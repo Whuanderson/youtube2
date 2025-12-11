@@ -1,10 +1,40 @@
 import path from 'path';
 import fs from 'fs';
 import { promisify } from 'util';
+import { spawn } from 'child_process';
 import formidable from 'formidable';
 import { outputDir } from '../../src/config.js';
 
 const mkdir = promisify(fs.mkdir);
+
+function getAudioDuration(filePath) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-v', 'error',
+      '-show_entries', 'format=duration',
+      '-of', 'default=noprint_wrappers=1:nokey=1',
+      filePath
+    ];
+    
+    const child = spawn('ffprobe', args);
+    let output = '';
+    
+    child.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    child.on('close', (code) => {
+      if (code === 0) {
+        const duration = parseFloat(output.trim());
+        resolve(isNaN(duration) ? 0 : duration);
+      } else {
+        resolve(0); // fallback se ffprobe falhar
+      }
+    });
+    
+    child.on('error', () => resolve(0));
+  });
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -28,7 +58,7 @@ export default async function handler(req, res) {
     },
   });
 
-  form.parse(req, (err, _fields, files) => {
+  form.parse(req, async (err, _fields, files) => {
     if (err) {
       // eslint-disable-next-line no-console
       console.error(err);
@@ -40,7 +70,13 @@ export default async function handler(req, res) {
     }
 
     const storedPath = Array.isArray(file) ? file[0].filepath : file.filepath;
-    return res.status(200).json({ ok: true, audioPath: storedPath });
+    const duration = await getAudioDuration(storedPath);
+    
+    return res.status(200).json({ 
+      ok: true, 
+      audioPath: storedPath,
+      duration: Math.round(duration * 10) / 10 // arredonda para 1 casa decimal
+    });
   });
 }
 

@@ -18,16 +18,34 @@ export default async function handler(req, res) {
   }
 
   try {
-    const inputPath = audioPath.startsWith('http') 
-      ? path.join(process.cwd(), 'output', path.basename(audioPath))
-      : audioPath;
-
-    if (!fs.existsSync(inputPath)) {
-      return res.status(404).json({ error: 'Arquivo de áudio não encontrado' });
+    // Converte URL da API para path do sistema
+    let inputPath;
+    if (audioPath.startsWith('/api/download?file=')) {
+      // Extrai o nome do arquivo da URL: /api/download?file=uploads/arquivo.mp3
+      const fileName = audioPath.split('file=')[1];
+      inputPath = path.join(process.cwd(), 'output', fileName);
+    } else if (audioPath.startsWith('http')) {
+      inputPath = path.join(process.cwd(), 'output', path.basename(audioPath));
+    } else {
+      inputPath = audioPath;
     }
 
-    const outputDir = path.join(process.cwd(), 'output');
+    console.log('🔊 Processando áudio...');
+    console.log('   📁 URL recebida:', audioPath);
+    console.log('   📁 Path convertido:', inputPath);
+
+    if (!fs.existsSync(inputPath)) {
+      console.error('❌ Arquivo não encontrado!');
+      console.log('   🔍 Procurando em:', inputPath);
+      console.log('   📁 Arquivo existe?', fs.existsSync(inputPath));
+      return res.status(404).json({ error: `Arquivo de áudio não encontrado: ${inputPath}` });
+    }
+
+    const projectRoot = process.cwd();
+    const outputDir = path.join(projectRoot, 'output');
     const outputPath = path.join(outputDir, 'audio_sem_silencio.mp3');
+    
+    console.log('   🎯 Diretório de saída:', outputDir);
 
     console.log('🔊 Removendo silêncios do áudio...');
     console.log('   📁 Input:', inputPath);

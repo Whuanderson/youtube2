@@ -17,6 +17,7 @@ export default function TTS() {
   const [loadingLegenda, setLoadingLegenda] = useState(false);
   const [loadingRemocao, setLoadingRemocao] = useState(false);
   const [status, setStatus] = useState('');
+  const [tipoUpload, setTipoUpload] = useState('para-processar'); // 'para-processar' ou 'final'
 
   useEffect(() => {
     carregarDados();
@@ -87,7 +88,7 @@ export default function TTS() {
     }
   };
 
-  const handleAudioUpload = async (event) => {
+  const handleAudioUpload = async (event, tipo) => {
     const file = event.target.files?.[0];
     if (!file) return;
     
@@ -100,9 +101,17 @@ export default function TTS() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       
-      setAudioComSilencio(data.audioPath);
-      setDuracaoAudioComSilencio(data.duration || 0);
-      setStatus(`✅ Áudio carregado: ${data.duration}s`);
+      if (tipo === 'final') {
+        // Áudio já está pronto, sem necessidade de remover silêncio
+        setAudioSemSilencio(data.audioPath);
+        setDuracaoAudioSemSilencio(data.duration || 0);
+        setStatus(`✅ Áudio final carregado: ${data.duration}s (pronto para usar)`);
+      } else {
+        // Áudio precisa processar para remover silêncio
+        setAudioComSilencio(data.audioPath);
+        setDuracaoAudioComSilencio(data.duration || 0);
+        setStatus(`✅ Áudio carregado: ${data.duration}s (clique em remover silêncios)`);
+      }
     } catch (err) {
       setStatus(`❌ ${err.message}`);
     } finally {
@@ -297,13 +306,33 @@ export default function TTS() {
           </button>
         </div>
 
-        {/* Upload Manual */}
+        {/* Upload Manual - COM processamento */}
         <div className="audio-section">
-          <h3 className="section-title">Opção 2: Upload Manual</h3>
+          <h3 className="section-title">Opção 2: Upload para Processar</h3>
           <div className="form-group">
-            <label>📁 Áudio</label>
-            <input type="file" accept="audio/*" onChange={handleAudioUpload} disabled={loading} />
-            <p className="tiny">Envie um .mp3, .wav ou outro formato de áudio</p>
+            <label>📁 Áudio Original (com silêncios)</label>
+            <input 
+              type="file" 
+              accept="audio/*" 
+              onChange={(e) => handleAudioUpload(e, 'para-processar')} 
+              disabled={loading} 
+            />
+            <p className="tiny">⚠️ Upload de áudio que precisa remover silêncios</p>
+          </div>
+        </div>
+
+        {/* Upload Manual - SEM processamento */}
+        <div className="audio-section">
+          <h3 className="section-title">Opção 3: Upload Áudio Final</h3>
+          <div className="form-group">
+            <label>✅ Áudio Pronto (sem silêncios)</label>
+            <input 
+              type="file" 
+              accept="audio/*" 
+              onChange={(e) => handleAudioUpload(e, 'final')} 
+              disabled={loading} 
+            />
+            <p className="tiny">✨ Áudio já editado e pronto para usar no vídeo</p>
           </div>
         </div>
 

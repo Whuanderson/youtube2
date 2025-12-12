@@ -3,8 +3,6 @@ out/
 dist/
 
 node_modules/
-output/
-output/uploads/
 pnpm-lock.yaml
 npm-debug.log*
 yarn-debug.log*

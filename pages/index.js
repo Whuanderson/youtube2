@@ -138,6 +138,30 @@ export default function Home() {
     setGeneratedScenes(next);
   };
 
+  const handleDeletarAudio = async () => {
+    if (!confirm('⚠️ Tem certeza que deseja deletar o áudio?')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/deletar-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioPath: audioInfo.audioSemSilencio }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      setAudioInfo(null);
+      setStatus('✅ Áudio deletado com sucesso');
+    } catch (err) {
+      setStatus(`❌ Erro ao deletar: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const syncWithAudio = () => {
     if (!audioInfo?.duracaoAudioSemSilencio || generatedScenes.length === 0) {
       alert('⚠️ Certifique-se de ter áudio processado e cenas geradas');
@@ -324,8 +348,18 @@ export default function Home() {
                 <p className="label">🎵 Áudio Pronto</p>
                 <p className="tiny">Sincronize o tempo com as imagens</p>
               </div>
-              <div className="audio-duration-badge">
-                {audioInfo.duracaoAudioSemSilencio}s
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div className="audio-duration-badge">
+                  {audioInfo.duracaoAudioSemSilencio}s
+                </div>
+                <button 
+                  onClick={handleDeletarAudio}
+                  disabled={loading}
+                  className="btn-delete-small"
+                  title="Deletar áudio"
+                >
+                  🗑️
+                </button>
               </div>
             </div>
             
@@ -347,9 +381,22 @@ export default function Home() {
             
             {audioInfo.audioSemSilencio && (
               <audio 
+                key={audioInfo.audioSemSilencio}
                 controls 
+                preload="auto"
                 src={audioInfo.audioSemSilencio} 
                 style={{ width: '100%', marginTop: '1rem' }}
+                onError={(e) => {
+                  console.error('❌ Erro ao carregar áudio:', audioInfo.audioSemSilencio);
+                  console.error('❌ Detalhes:', e.target.error);
+                }}
+                onLoadedMetadata={(e) => {
+                  console.log('✅ Áudio carregado na página de imagens:', e.target.duration + 's');
+                  console.log('   🔗 URL:', audioInfo.audioSemSilencio);
+                }}
+                onCanPlay={() => {
+                  console.log('▶️ Áudio pronto na página de imagens');
+                }}
               />
             )}
           </div>

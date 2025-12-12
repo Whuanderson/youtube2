@@ -33,11 +33,39 @@ export default function handler(req, res) {
   };
   const contentType = mimeTypes[ext] || 'application/octet-stream';
   
+  const stat = fs.statSync(resolved);
+  const fileSize = stat.size;
   const fileName = path.basename(resolved);
-  res.setHeader('Content-Type', contentType);
-  res.setHeader('Content-Disposition', `inline; filename="${fileName}"`);
-  res.setHeader('Accept-Ranges', 'bytes');
   
-  const stream = fs.createReadStream(resolved);
-  stream.pipe(res);
+  // Suporte a Range Requests (necessário para seek em áudio/vídeo)
+  const range = req.headers.range;
+  
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+    const chunksize = (end - start) + 1;
+    
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunksize,
+      'Content-Type': contentType,
+      'Cache-Control': 'no-cache',
+    });
+    
+    const stream = fs.createReadStream(resolved, { start, end });
+    stream.pipe(res);
+  } else {
+    res.writeHead(200, {
+      'Content-Length': fileSize,
+      'Content-Type': contentType,
+      'Content-Disposition': `inline; filename="${fileName}"`,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'no-cache',
+    });
+    
+    const stream = fs.createReadStream(resolved);
+    stream.pipe(res);
+  }
 }

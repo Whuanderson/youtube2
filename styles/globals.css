@@ -930,6 +930,56 @@ input[type='file'] {
   cursor: not-allowed;
 }
 
+/* ===== DELETE BUTTON ===== */
+.btn-delete-small {
+  padding: 0.5rem 0.75rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  color: #ef4444;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+}
+
+.btn-delete-small:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: scale(1.05);
+}
+
+.btn-delete-small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== AUDIO PLAYER ===== */
+audio {
+  height: 48px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  outline: none;
+}
+
+audio::-webkit-media-controls-panel {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+audio::-webkit-media-controls-current-time-display,
+audio::-webkit-media-controls-time-remaining-display {
+  color: #7dd3fc;
+  font-weight: 600;
+}
+
+audio:focus {
+  outline: 2px solid rgba(125, 211, 252, 0.5);
+  outline-offset: 2px;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
   .sidebar {

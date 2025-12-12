@@ -1,11 +1,9 @@
 import path from 'path';
 import fs from 'fs';
-import { promisify } from 'util';
+import fsPromises from 'fs/promises';
 import { spawn } from 'child_process';
 import formidable from 'formidable';
 import { outputDir } from '../../src/config.js';
-
-const mkdir = promisify(fs.mkdir);
 
 function getAudioDuration(filePath) {
   return new Promise((resolve, reject) => {
@@ -45,7 +43,7 @@ export default async function handler(req, res) {
   // Usa process.cwd() para garantir que sempre aponta para a raiz do projeto
   const projectRoot = process.cwd();
   const uploadsDir = path.join(projectRoot, 'output', 'uploads');
-  await mkdir(uploadsDir, { recursive: true });
+  await fsPromises.mkdir(uploadsDir, { recursive: true });
   
   console.log('📍 Diretório de upload:', uploadsDir);
 
@@ -83,16 +81,35 @@ export default async function handler(req, res) {
     
     const duration = await getAudioDuration(storedPath);
     
-    // Retorna URL acessível pelo navegador
-    const fileName = path.basename(storedPath);
-    const audioUrl = `/api/download?file=uploads/${fileName}`;
+    // Copia para pasta public/audio para servir estaticamente
+    const publicAudioDir = path.join(projectRoot, 'public', 'audio');
+    await fsPromises.mkdir(publicAudioDir, { recursive: true });
     
-    console.log('   🔗 URL gerada:', audioUrl);
+    const fileName = path.basename(storedPath);
+    const publicPath = path.join(publicAudioDir, fileName);
+    
+    console.log('   📂 Copiando para public/audio...');
+    console.log('   📍 Origem:', storedPath);
+    console.log('   📍 Destino:', publicPath);
+    
+    // Copia arquivo para public
+    await fsPromises.copyFile(storedPath, publicPath);
+    console.log('   ✅ Copiado com sucesso!');
+    
+    // Verifica se arquivo foi copiado
+    const existsInPublic = fs.existsSync(publicPath);
+    console.log('   ✅ Arquivo existe em public?', existsInPublic);
+    
+    // URL direta (sem API route)
+    const audioUrl = `/audio/${fileName}`;
+    
+    console.log('   🔗 URL pública:', audioUrl);
     
     return res.status(200).json({ 
       ok: true, 
       audioPath: audioUrl,
-      duration: Math.round(duration * 10) / 10 // arredonda para 1 casa decimal
+      duration: Math.round(duration * 10) / 10,
+      fileName: fileName
     });
   });
 }

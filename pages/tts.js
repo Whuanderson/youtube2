@@ -29,14 +29,17 @@ export default function TTS() {
       const res = await fetch('/api/carregar-audio-info');
       const data = await res.json();
       if (data.success && data.audioInfo) {
+        console.log('📂 Info de áudio carregada:', data.audioInfo);
         setAudioComSilencio(data.audioInfo.audioComSilencio || '');
         setAudioSemSilencio(data.audioInfo.audioSemSilencio || '');
         setDuracaoAudioComSilencio(data.audioInfo.duracaoAudioComSilencio || 0);
         setDuracaoAudioSemSilencio(data.audioInfo.duracaoAudioSemSilencio || 0);
-        console.log('📂 Áudio restaurado do rascunho');
+        console.log('✅ Áudio restaurado do rascunho');
+      } else {
+        console.log('⚠️ Nenhuma info de áudio salva');
       }
     } catch (err) {
-      console.error('Erro ao carregar áudio:', err);
+      console.error('❌ Erro ao carregar áudio:', err);
     }
   };
 
@@ -201,6 +204,35 @@ export default function TTS() {
       setStatus(`❌ ${err.message}`);
     } finally {
       setLoadingRemocao(false);
+    }
+  };
+
+  const handleDeletarAudio = async () => {
+    if (!confirm('⚠️ Tem certeza que deseja deletar o áudio?')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const audioToDelete = audioSemSilencio || audioComSilencio;
+      const res = await fetch('/api/deletar-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioPath: audioToDelete }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      // Limpa estados
+      setAudioComSilencio('');
+      setAudioSemSilencio('');
+      setDuracaoAudioComSilencio(0);
+      setDuracaoAudioSemSilencio(0);
+      setStatus('✅ Áudio deletado com sucesso');
+    } catch (err) {
+      setStatus(`❌ Erro ao deletar: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -410,14 +442,41 @@ export default function TTS() {
               <h3>🔊 Áudio Original (Com Silêncios)</h3>
               <span className="duration-badge">{duracaoAudioComSilencio}s</span>
             </div>
-            <audio controls src={audioComSilencio} style={{ width: '100%' }} />
-            <button 
-              onClick={handleRemoverSilencio} 
-              disabled={loadingRemocao}
-              style={{ marginTop: '1rem' }}
-            >
-              {loadingRemocao ? 'Processando...' : '✂️ Remover Silêncios'}
-            </button>
+            <audio 
+              key={audioComSilencio}
+              controls 
+              preload="auto"
+              src={audioComSilencio} 
+              style={{ width: '100%' }}
+              onError={(e) => {
+                console.error('❌ Erro ao carregar áudio:', audioComSilencio);
+                console.error('❌ Detalhes:', e.target.error);
+                setStatus('❌ Erro ao carregar áudio. Verifique o arquivo.');
+              }}
+              onLoadedMetadata={(e) => {
+                console.log('✅ Áudio carregado:', e.target.duration + 's');
+                console.log('   🔗 URL:', audioComSilencio);
+              }}
+              onCanPlay={() => {
+                console.log('▶️ Áudio pronto para reproduzir');
+              }}
+            />
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+              <button 
+                onClick={handleRemoverSilencio} 
+                disabled={loadingRemocao}
+                style={{ flex: 1 }}
+              >
+                {loadingRemocao ? 'Processando...' : '✂️ Remover Silêncios'}
+              </button>
+              <button 
+                onClick={handleDeletarAudio} 
+                disabled={loading}
+                className="btn-delete-small"
+              >
+                🗑️
+              </button>
+            </div>
             <p className="tiny" style={{ marginTop: '0.5rem' }}>
               💡 Remove trechos de silêncio para obter a duração real da narração
             </p>
@@ -431,13 +490,40 @@ export default function TTS() {
               <h3>✅ Áudio Final (Sem Silêncios)</h3>
               <span className="duration-badge success">{duracaoAudioSemSilencio}s</span>
             </div>
-            <audio controls src={audioSemSilencio} style={{ width: '100%' }} />
+            <audio 
+              key={audioSemSilencio}
+              controls 
+              preload="auto"
+              src={audioSemSilencio} 
+              style={{ width: '100%' }}
+              onError={(e) => {
+                console.error('❌ Erro ao carregar áudio final:', audioSemSilencio);
+                console.error('❌ Detalhes:', e.target.error);
+                setStatus('❌ Erro ao carregar áudio final. Verifique o arquivo.');
+              }}
+              onLoadedMetadata={(e) => {
+                console.log('✅ Áudio final carregado:', e.target.duration + 's');
+                console.log('   🔗 URL:', audioSemSilencio);
+              }}
+              onCanPlay={() => {
+                console.log('▶️ Áudio final pronto para reproduzir');
+              }}
+            />
             <div className="success-message">
               <p>🎯 Duração real do áudio: {duracaoAudioSemSilencio}s</p>
               <p>📊 Economia: {(duracaoAudioComSilencio - duracaoAudioSemSilencio).toFixed(1)}s de silêncio removidos</p>
-              <button onClick={() => router.push('/')} style={{ marginTop: '1rem' }}>
-                ➡️ Ir para Imagens
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+                <button onClick={() => router.push('/')} style={{ flex: 1 }}>
+                  ➡️ Ir para Imagens
+                </button>
+                <button 
+                  onClick={handleDeletarAudio} 
+                  disabled={loading}
+                  className="btn-delete-small"
+                >
+                  🗑️
+                </button>
+              </div>
             </div>
           </div>
         )}

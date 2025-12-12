@@ -18,14 +18,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Converte URL da API para path do sistema
+    // Converte URL para path do sistema
     let inputPath;
-    if (audioPath.startsWith('/api/download?file=')) {
-      // Extrai o nome do arquivo da URL: /api/download?file=uploads/arquivo.mp3
+    const projectRoot = process.cwd();
+    
+    if (audioPath.startsWith('/audio/')) {
+      // Arquivo está em public/audio/
+      const fileName = path.basename(audioPath);
+      inputPath = path.join(projectRoot, 'public', 'audio', fileName);
+    } else if (audioPath.startsWith('/api/download?file=')) {
+      // Arquivo está em output/uploads/
       const fileName = audioPath.split('file=')[1];
-      inputPath = path.join(process.cwd(), 'output', fileName);
+      inputPath = path.join(projectRoot, 'output', fileName);
     } else if (audioPath.startsWith('http')) {
-      inputPath = path.join(process.cwd(), 'output', path.basename(audioPath));
+      inputPath = path.join(projectRoot, 'output', path.basename(audioPath));
     } else {
       inputPath = audioPath;
     }
@@ -41,9 +47,11 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: `Arquivo de áudio não encontrado: ${inputPath}` });
     }
 
-    const projectRoot = process.cwd();
-    const outputDir = path.join(projectRoot, 'output');
-    const outputPath = path.join(outputDir, 'audio_sem_silencio.mp3');
+    // Saída também em public/audio/ para servir estaticamente
+    const publicAudioDir = path.join(projectRoot, 'public', 'audio');
+    const timestamp = Date.now();
+    const outputFileName = `audio_sem_silencio_${timestamp}.mp3`;
+    const outputPath = path.join(publicAudioDir, outputFileName);
     
     console.log('   🎯 Diretório de saída:', outputDir);
 
@@ -93,10 +101,11 @@ export default async function handler(req, res) {
 
     console.log('✅ Silêncios removidos!');
     console.log(`   ⏱️  Duração final: ${duration}s`);
+    console.log(`   🔗 URL pública: /audio/${outputFileName}`);
 
     res.status(200).json({
       success: true,
-      audioPath: '/api/download?file=audio_sem_silencio.mp3',
+      audioPath: `/audio/${outputFileName}`,
       duration,
       message: 'Silêncios removidos com sucesso'
     });

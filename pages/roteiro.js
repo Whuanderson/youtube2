@@ -28,7 +28,7 @@ export default function Roteiro() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           tema, 
-          duracao: parseInt(duracao), 
+          duracao: parseFloat(duracao),
           quantidadeImagens: parseInt(quantidadeImagens),
           tom, 
           provider, 
@@ -58,14 +58,29 @@ export default function Roteiro() {
 
   const handleSalvar = async () => {
     try {
+      // Salva roteiro
       await fetch('/api/salvar-roteiro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roteiro }),
       });
       
-      // Redireciona para página de imagens
-      router.push('/');
+      // Gera arquivo SRT a partir do roteiro com duração específica
+      const srtRes = await fetch('/api/gerar-srt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roteiro, duracaoMinutos: parseFloat(duracao) }),
+      });
+      const srtData = await srtRes.json();
+      
+      if (srtData.success) {
+        alert(`✅ Roteiro e legendas salvos!\n\n📊 ${srtData.blocos} blocos de legenda\n⏱️ Duração estimada: ${srtData.duracaoMinutos} minutos`);
+        // Redireciona para página de TTS
+        router.push('/tts');
+      } else {
+        alert('✅ Roteiro salvo! Vá para a página de TTS.');
+        router.push('/tts');
+      }
     } catch (err) {
       alert(err.message);
     }
@@ -96,10 +111,11 @@ export default function Roteiro() {
               type="number"
               value={duracao}
               onChange={(e) => setDuracao(e.target.value)}
-              min="1"
+              min="0.5"
               max="10"
               step="0.5"
             />
+            <p className="tiny">Tempo total do vídeo</p>
           </div>
 
           <div className="form-group">
@@ -154,7 +170,7 @@ export default function Roteiro() {
           <div className="card">
             <div className="card-head">
               <p className="label">Roteiro Gerado</p>
-              <button onClick={handleSalvar}>💾 Salvar e Ir para Imagens →</button>
+              <button onClick={handleSalvar}>💾 Salvar, Gerar SRT e Ir para TTS →</button>
             </div>
             <textarea
               value={roteiro}

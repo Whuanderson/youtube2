@@ -72,7 +72,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const tema = asString(req.body?.tema).trim();
-  const duracao = parseInt(req.body?.duracao) || 1; // duração em minutos
+  const duracao = parseFloat(req.body?.duracao) || 1;
   const quantidadeImagens = parseInt(req.body?.quantidadeImagens) || 4;
   const tom = asString(req.body?.tom).trim();
   const provider = asString(req.body?.provider, "openai").trim();
@@ -80,21 +80,19 @@ export default async function handler(req, res) {
 
   if (!tema) return res.status(400).json({ error: "Campo 'tema' é obrigatório." });
 
-  const duracaoSegundos = duracao * 60;
-
   const promptRoteiro = `Crie um roteiro detalhado para um vídeo do YouTube com as seguintes especificações:
 
 Tema: ${tema}
-Duração: ${duracao} minuto(s) (${duracaoSegundos} segundos)
+Duração: ${duracao} minuto(s)
 Tom: ${tom || "neutro"}
 
 O roteiro deve incluir:
-1. Introdução impactante (10% da duração)
-2. Desenvolvimento completo com pontos-chave (70% da duração)
-3. Conclusão com call-to-action (20% da duração)
-4. Marcações de tempo para cada seção
+1. Introdução impactante e chamativa
+2. Desenvolvimento completo com pontos-chave bem explicados
+3. Conclusão com call-to-action forte
 
-Formato: Texto corrido, natural para narração, sem colchetes e sem formatação excessiva. Seja direto e engajante.`;
+Formato: Texto corrido, natural para narração, sem colchetes e sem formatação excessiva. Seja direto e engajante. 
+IMPORTANTE: NÃO inclua marcações de tempo (como "0:00 - Introdução"), pois elas serão geradas automaticamente depois a partir das legendas SRT.`;
 
   const promptImagens = `Baseado no tema "${tema}", crie EXATAMENTE ${quantidadeImagens} prompts para gerar imagens que acompanhem o vídeo.
 

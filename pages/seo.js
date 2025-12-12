@@ -1,12 +1,21 @@
 import { useState, useEffect } from 'react';
+import { AI_PROVIDERS, DEFAULT_PROVIDER, DEFAULT_MODEL } from '../src/ai-config';
 
 export default function SEO() {
   const [titulo, setTitulo] = useState('');
   const [descricao, setDescricao] = useState('');
   const [tags, setTags] = useState('');
   const [categoria, setCategoria] = useState('22'); // People & Blogs
+  const [provider, setProvider] = useState(DEFAULT_PROVIDER);
+  const [model, setModel] = useState(DEFAULT_MODEL);
   const [sugestoes, setSugestoes] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [availableModels, setAvailableModels] = useState(AI_PROVIDERS[DEFAULT_PROVIDER].models);
+
+  useEffect(() => {
+    setAvailableModels(AI_PROVIDERS[provider].models);
+    setModel(AI_PROVIDERS[provider].models[0].id);
+  }, [provider]);
 
   const handleGerarSEO = async () => {
     setLoading(true);
@@ -15,7 +24,7 @@ export default function SEO() {
       const res = await fetch('/api/gerar-seo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo }),
+        body: JSON.stringify({ titulo, provider, model }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -58,6 +67,26 @@ export default function SEO() {
             maxLength="100"
           />
           <p className="tiny">{titulo.length}/100 caracteres</p>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>🤖 Provedor de IA</label>
+            <select value={provider} onChange={(e) => setProvider(e.target.value)}>
+              {Object.entries(AI_PROVIDERS).map(([key, value]) => (
+                <option key={key} value={key}>{value.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>🎯 Modelo</label>
+            <select value={model} onChange={(e) => setModel(e.target.value)}>
+              {availableModels.map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <button onClick={handleGerarSEO} disabled={loading || !titulo}>

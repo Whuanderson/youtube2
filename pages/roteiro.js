@@ -1,11 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { AI_PROVIDERS, DEFAULT_PROVIDER, DEFAULT_MODEL } from '../src/ai-config';
 
 export default function Roteiro() {
   const [tema, setTema] = useState('');
   const [duracao, setDuracao] = useState('60');
   const [tom, setTom] = useState('profissional');
+  const [provider, setProvider] = useState(DEFAULT_PROVIDER);
+  const [model, setModel] = useState(DEFAULT_MODEL);
   const [roteiro, setRoteiro] = useState('');
   const [loading, setLoading] = useState(false);
+  const [availableModels, setAvailableModels] = useState(AI_PROVIDERS[DEFAULT_PROVIDER].models);
+
+  useEffect(() => {
+    setAvailableModels(AI_PROVIDERS[provider].models);
+    setModel(AI_PROVIDERS[provider].models[0].id);
+  }, [provider]);
 
   const handleGerar = async () => {
     setLoading(true);
@@ -14,7 +23,7 @@ export default function Roteiro() {
       const res = await fetch('/api/gerar-roteiro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tema, duracao, tom }),
+        body: JSON.stringify({ tema, duracao, tom, provider, model }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -76,6 +85,26 @@ export default function Roteiro() {
               <option value="casual">Casual</option>
               <option value="energetico">Energético</option>
               <option value="educativo">Educativo</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label>🤖 Provedor de IA</label>
+            <select value={provider} onChange={(e) => setProvider(e.target.value)}>
+              {Object.entries(AI_PROVIDERS).map(([key, value]) => (
+                <option key={key} value={key}>{value.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label>🎯 Modelo</label>
+            <select value={model} onChange={(e) => setModel(e.target.value)}>
+              {availableModels.map((m) => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
             </select>
           </div>
         </div>

@@ -72,17 +72,20 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const tema = asString(req.body?.tema).trim();
-  const duracao = asString(req.body?.duracao).trim(); // pode vir em segundos ou "10 min"
+  const duracao = parseInt(req.body?.duracao) || 1; // duração em minutos
+  const quantidadeImagens = parseInt(req.body?.quantidadeImagens) || 4;
   const tom = asString(req.body?.tom).trim();
   const provider = asString(req.body?.provider, "openai").trim();
   const model = asString(req.body?.model, "gpt-5-mini").trim();
 
   if (!tema) return res.status(400).json({ error: "Campo 'tema' é obrigatório." });
 
-  const prompt = `Crie um roteiro detalhado para um vídeo do YouTube com as seguintes especificações:
+  const duracaoSegundos = duracao * 60;
+
+  const promptRoteiro = `Crie um roteiro detalhado para um vídeo do YouTube com as seguintes especificações:
 
 Tema: ${tema}
-Duração: ${duracao || "não informada"}
+Duração: ${duracao} minuto(s) (${duracaoSegundos} segundos)
 Tom: ${tom || "neutro"}
 
 O roteiro deve incluir:
@@ -90,28 +93,59 @@ O roteiro deve incluir:
 2. Desenvolvimento completo com pontos-chave (70% da duração)
 3. Conclusão com call-to-action (20% da duração)
 4. Marcações de tempo para cada seção
-5. Sugestões de 3-4 prompts para gerar imagens que acompanhem o vídeo
 
 Formato: Texto corrido, natural para narração, sem colchetes e sem formatação excessiva. Seja direto e engajante.`;
 
+  const promptImagens = `Baseado no tema "${tema}", crie EXATAMENTE ${quantidadeImagens} prompts para gerar imagens que acompanhem o vídeo.
+
+Cada prompt deve:
+- Ser descritivo e específico para Whisk/Midjourney
+- Estar relacionado ao tema do vídeo
+- Ser visualmente interessante
+- Ter entre 10-20 palavras
+
+Retorne APENAS um array JSON com os prompts, sem explicações:
+["prompt 1", "prompt 2", ...]`;
+
   try {
     let roteiro = "";
+    let promptsResposta = "";
 
     switch (provider) {
       case "openai":
-        roteiro = await gerarComOpenAI(prompt, model, { temperature: 0.7, maxOutputTokens: 5000 });
+        roteiro = await gerarComOpenAI(promptRoteiro, model, { temperature: 0.7, maxOutputTokens: 5000 });
+        promptsResposta = await gerarComOpenAI(promptImagens, model, { temperature: 0.8, maxOutputTokens: 1000 });
         break;
       case "anthropic":
-        roteiro = await gerarComAnthropic(prompt, model, { maxTokens: 4000 });
+        roteiro = await gerarComAnthropic(promptRoteiro, model, { maxTokens: 4000 });
+        promptsResposta = await gerarComAnthropic(promptImagens, model, { maxTokens: 1000 });
         break;
       case "gemini":
-        roteiro = await gerarComGemini(prompt, model, { temperature: 0.7 });
+        roteiro = await gerarComGemini(promptRoteiro, model, { temperature: 0.7 });
+        promptsResposta = await gerarComGemini(promptImagens, model, { temperature: 0.8 });
         break;
       default:
         return res.status(400).json({ error: "Provedor não suportado" });
     }
 
-    return res.status(200).json({ roteiro });
+    // Extrai array JSON dos prompts
+    let prompts = [];
+    try {
+      const jsonMatch = promptsResposta.match(/\[[\s\S]*?\]/);
+      if (jsonMatch) {
+        prompts = JSON.parse(jsonMatch[0]);
+      }
+    } catch (err) {
+      console.error("Erro ao parsear prompts:", err);
+      // Fallback: tenta dividir por linhas
+      prompts = promptsResposta
+        .split('\n')
+        .filter(line => line.trim() && !line.includes('[') && !line.includes(']'))
+        .map(line => line.replace(/^["\d\.\-\*\s]+/, '').replace(/["]+$/, '').trim())
+        .filter(line => line.length > 10);
+    }
+
+    return res.status(200).json({ roteiro, prompts });
   } catch (err) {
     console.error("Erro ao gerar roteiro:", err);
     return res.status(500).json({

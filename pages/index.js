@@ -17,10 +17,25 @@ export default function Home() {
   const [videoPath, setVideoPath] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Carrega as cenas geradas ao montar o componente
+  // Carrega as cenas geradas e prompts salvos ao montar o componente
   useEffect(() => {
     syncScenesFromServer();
+    loadSavedPrompts();
   }, []);
+
+  const loadSavedPrompts = async () => {
+    try {
+      const res = await fetch('/api/carregar-prompts');
+      const data = await res.json();
+      if (data.prompts && data.prompts.length > 0) {
+        const formattedPrompts = data.prompts.map(p => ({ prompt: p }));
+        setPrompts(formattedPrompts);
+        console.log('✅ Prompts carregados do roteiro:', data.prompts.length);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar prompts:', err);
+    }
+  };
 
   const syncScenesFromServer = async () => {
     try {

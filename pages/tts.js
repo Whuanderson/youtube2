@@ -21,7 +21,24 @@ export default function TTS() {
 
   useEffect(() => {
     carregarDados();
+    carregarAudioInfo();
   }, []);
+
+  const carregarAudioInfo = async () => {
+    try {
+      const res = await fetch('/api/carregar-audio-info');
+      const data = await res.json();
+      if (data.success && data.audioInfo) {
+        setAudioComSilencio(data.audioInfo.audioComSilencio || '');
+        setAudioSemSilencio(data.audioInfo.audioSemSilencio || '');
+        setDuracaoAudioComSilencio(data.audioInfo.duracaoAudioComSilencio || 0);
+        setDuracaoAudioSemSilencio(data.audioInfo.duracaoAudioSemSilencio || 0);
+        console.log('📂 Áudio restaurado do rascunho');
+      }
+    } catch (err) {
+      console.error('Erro ao carregar áudio:', err);
+    }
+  };
 
   const carregarDados = async () => {
     try {
@@ -106,11 +123,35 @@ export default function TTS() {
         setAudioSemSilencio(data.audioPath);
         setDuracaoAudioSemSilencio(data.duration || 0);
         setStatus(`✅ Áudio final carregado: ${data.duration}s (pronto para usar)`);
+        
+        // Salva info
+        await fetch('/api/salvar-audio-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioComSilencio: '',
+            audioSemSilencio: data.audioPath,
+            duracaoAudioComSilencio: 0,
+            duracaoAudioSemSilencio: data.duration || 0,
+          }),
+        });
       } else {
         // Áudio precisa processar para remover silêncio
         setAudioComSilencio(data.audioPath);
         setDuracaoAudioComSilencio(data.duration || 0);
         setStatus(`✅ Áudio carregado: ${data.duration}s (clique em remover silêncios)`);
+        
+        // Salva info
+        await fetch('/api/salvar-audio-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            audioComSilencio: data.audioPath,
+            audioSemSilencio: '',
+            duracaoAudioComSilencio: data.duration || 0,
+            duracaoAudioSemSilencio: 0,
+          }),
+        });
       }
     } catch (err) {
       setStatus(`❌ ${err.message}`);
@@ -139,6 +180,18 @@ export default function TTS() {
       setAudioSemSilencio(data.audioPath);
       setDuracaoAudioSemSilencio(data.duration);
       setStatus(`✅ Silêncios removidos! Duração real: ${data.duration}s`);
+      
+      // Salva info completa
+      await fetch('/api/salvar-audio-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioComSilencio,
+          audioSemSilencio: data.audioPath,
+          duracaoAudioComSilencio,
+          duracaoAudioSemSilencio: data.duration,
+        }),
+      });
       
       // Redireciona para imagens após alguns segundos
       setTimeout(() => {
@@ -171,6 +224,18 @@ export default function TTS() {
       setAudioComSilencio(data.audioPath);
       setDuracaoAudioComSilencio(data.duration);
       setStatus(`✅ Áudio gerado: ${data.duration}s (com silêncios)`);
+      
+      // Salva info
+      await fetch('/api/salvar-audio-info', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audioComSilencio: data.audioPath,
+          audioSemSilencio: '',
+          duracaoAudioComSilencio: data.duration,
+          duracaoAudioSemSilencio: 0,
+        }),
+      });
     } catch (err) {
       setStatus(`❌ ${err.message}`);
     } finally {

@@ -14,6 +14,7 @@ export default function Home() {
   const [status, setStatus] = useState('');
   const [audioPath, setAudioPath] = useState('');
   const [audioDuration, setAudioDuration] = useState(0);
+  const [audioInfo, setAudioInfo] = useState(null);
   const [videoPath, setVideoPath] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +22,21 @@ export default function Home() {
   useEffect(() => {
     syncScenesFromServer();
     loadSavedPrompts();
+    loadAudioInfo();
   }, []);
+
+  const loadAudioInfo = async () => {
+    try {
+      const res = await fetch('/api/carregar-audio-info');
+      const data = await res.json();
+      if (data.success && data.audioInfo) {
+        setAudioInfo(data.audioInfo);
+        console.log('🎵 Info de áudio carregada:', data.audioInfo.duracaoAudioSemSilencio + 's');
+      }
+    } catch (err) {
+      console.error('Erro ao carregar info de áudio:', err);
+    }
+  };
 
   const loadSavedPrompts = async () => {
     try {
@@ -121,6 +136,25 @@ export default function Home() {
     const next = [...generatedScenes];
     [next[index], next[index + 1]] = [next[index + 1], next[index]];
     setGeneratedScenes(next);
+  };
+
+  const syncWithAudio = () => {
+    if (!audioInfo?.duracaoAudioSemSilencio || generatedScenes.length === 0) {
+      alert('⚠️ Certifique-se de ter áudio processado e cenas geradas');
+      return;
+    }
+
+    const totalDuration = audioInfo.duracaoAudioSemSilencio;
+    const numScenes = generatedScenes.length;
+    const durationPerScene = totalDuration / numScenes;
+
+    const updated = generatedScenes.map(scene => ({
+      ...scene,
+      duration: Math.round(durationPerScene * 10) / 10, // Arredonda para 1 casa decimal
+    }));
+
+    setGeneratedScenes(updated);
+    setStatus(`✅ Tempo distribuído: ${durationPerScene.toFixed(1)}s por cena (${numScenes} cenas = ${totalDuration}s)`);
   };
 
   const handleGenerate = async () => {
@@ -282,8 +316,47 @@ export default function Home() {
           </div>
           {status && <div className="status">{status}</div>}
         </div>
+        {/* Card de Áudio Info */}
+        {audioInfo?.duracaoAudioSemSilencio > 0 && (
+          <div className="card audio-info-card">
+            <div className="audio-info-header">
+              <div>
+                <p className="label">🎵 Áudio Pronto</p>
+                <p className="tiny">Sincronize o tempo com as imagens</p>
+              </div>
+              <div className="audio-duration-badge">
+                {audioInfo.duracaoAudioSemSilencio}s
+              </div>
+            </div>
+            
+            {generatedScenes.length > 0 && (
+              <div className="sync-section">
+                <div className="sync-info">
+                  <span>🎬 {generatedScenes.length} cenas</span>
+                  <span>⏱️ Total: {generatedScenes.reduce((sum, s) => sum + s.duration, 0).toFixed(1)}s</span>
+                </div>
+                <button 
+                  onClick={syncWithAudio}
+                  className="btn-sync"
+                  disabled={loading}
+                >
+                  🔄 Sincronizar com Áudio
+                </button>
+              </div>
+            )}
+            
+            {audioInfo.audioSemSilencio && (
+              <audio 
+                controls 
+                src={audioInfo.audioSemSilencio} 
+                style={{ width: '100%', marginTop: '1rem' }}
+              />
+            )}
+          </div>
+        )}
+
         <div className="card upload">
-          <p className="label">Áudio</p>
+          <p className="label">Áudio (Legado)</p>
           <input type="file" accept="audio/*" onChange={handleAudioUpload} />
           {audioPath ? (
             <div>

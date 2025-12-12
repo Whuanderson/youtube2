@@ -832,6 +832,104 @@ input[type='file'] {
   font-size: 0.95rem;
 }
 
+/* ===== SIDEBAR FOOTER ===== */
+.sidebar-footer {
+  margin-top: auto;
+  padding: 1.5rem 1rem;
+  border-top: 1px solid rgba(125, 211, 252, 0.1);
+}
+
+.sidebar-hint {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  margin-top: 0.25rem;
+}
+
+.btn-danger {
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #ef4444;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ===== AUDIO INFO CARD ===== */
+.audio-info-card {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(125, 211, 252, 0.1));
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.audio-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.audio-duration-badge {
+  padding: 0.5rem 1rem;
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 8px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #22c55e;
+}
+
+.sync-section {
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.sync-info {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.btn-sync {
+  width: 100%;
+  padding: 0.75rem;
+  background: linear-gradient(135deg, #22c55e, #10b981);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+}
+
+.btn-sync:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+}
+
+.btn-sync:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
   .sidebar {
